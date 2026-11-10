@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-title" content="FCStd">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>FCStd ビューワー</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+JP:wght@400;500;600&display=swap">
+<style>
+/* Layout: full-bleed 3D viewport; drawing-style title block top-left, parts drawer left, tool rail bottom */
+:root {
+  --ink: #18212b;
+  --ink-2: #4a5866;
+  --line: #c9d2db;
+  --panel: rgba(250, 252, 253, 0.92);
+  --panel-solid: #f7f9fb;
+  --accent: #2753b8;
+  --accent-ink: #ffffff;
+  --cut: #d9822b;
+  --sky-top: #e9eef3;
+  --sky-bottom: #b9c6d3;
+  --edge: #1b2530;
+  --focus: #2753b8;
+  --shadow: 0 6px 24px rgba(24, 33, 43, 0.14);
+  --font-ui: "IBM Plex Sans JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #e4ebf2; --ink-2: #9fb0c0; --line: #33414f; --panel: rgba(22, 29, 37, 0.9); --panel-solid: #1a222b;
+    --accent: #7fa6ff; --accent-ink: #0d1520; --cut: #f0a457; --sky-top: #2a3542; --sky-bottom: #11171e; --edge: #0a0f14; --focus: #7fa6ff;
+    --shadow: 0 6px 24px rgba(0, 0, 0, 0.45); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #e4ebf2; --ink-2: #9fb0c0; --line: #33414f; --panel: rgba(22, 29, 37, 0.9); --panel-solid: #1a222b;
+  --accent: #7fa6ff; --accent-ink: #0d1520; --cut: #f0a457; --sky-top: #2a3542; --sky-bottom: #11171e; --edge: #0a0f14; --focus: #7fa6ff;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.45); color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--sky-bottom); color: var(--ink); font-family: var(--font-ui); font-size: 14px;
+  overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+#stage { position: fixed; inset: 0; background: linear-gradient(var(--sky-top), var(--sky-bottom)); touch-action: none; }
+#stage canvas { display: block; width: 100%; height: 100%; }
+
+.chrome {
+  position: fixed; inset: 0; pointer-events: none;
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; grid-template-rows: auto 1fr auto; gap: 12px;
+}
+.chrome > * { pointer-events: none; }
+.chrome .hit, .chrome button, .chrome input, .chrome label { pointer-events: auto; }
+
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.titleblock {
+  background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  display: grid; grid-template-columns: auto auto; min-width: 0; max-width: min(460px, 100%); font-size: 12px;
+}
+.titleblock .cell { padding: 6px 10px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); min-width: 0; }
+.titleblock .cell:nth-child(2n) { border-right: 0; }
+.titleblock .name { grid-column: 1 / -1; border-right: 0; padding: 8px 10px; }
+.titleblock .k { display: block; font-size: 10px; letter-spacing: 0.08em; color: var(--ink-2); }
+.titleblock .v { font-family: var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.titleblock .name .v { font-family: var(--font-ui); font-weight: 600; font-size: 15px; white-space: normal; overflow-wrap: anywhere; }
+.titleblock .badge { display: inline-block; margin-left: 6px; padding: 1px 6px; font-size: 10px; font-weight: 500; border: 1px solid var(--cut); color: var(--cut); vertical-align: 2px; }
+
+.btn {
+  font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+  min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; border-radius: 10px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.btn svg { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:focus-visible, .tool:focus-visible, .seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.top-actions { display: flex; gap: 8px; }
+
+.middle { position: relative; min-height: 0; }
+.drawer {
+  position: absolute; left: 0; top: 0; bottom: 0; width: min(300px, 82vw);
+  background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 12px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.drawer header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 8px; border-bottom: 1px solid var(--line); gap: 8px; }
+.drawer h2 { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.drawer .count { font-family: var(--font-num); font-size: 12px; color: var(--ink-2); }
+.drawer .bulk { display: flex; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.drawer .bulk button { font: inherit; font-size: 12px; color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 8px; min-height: 34px; padding: 0 10px; cursor: pointer; }
+.parts { list-style: none; margin: 0; padding: 4px 0; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; min-height: 0; }
+.parts .grp { padding: 10px 12px 4px; font-size: 11px; color: var(--ink-2); letter-spacing: 0.06em; }
+.part { display: flex; align-items: center; gap: 10px; padding: 0 12px; min-height: 46px; cursor: pointer; }
+.part.sel { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.part input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; margin: 0; }
+.part .sw { width: 14px; height: 14px; border: 1px solid rgba(0,0,0,.25); flex: none; }
+.part .lbl { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.part .ty { display: block; font-family: var(--font-num); font-size: 10px; color: var(--ink-2); }
+.part .busy { font-size: 11px; color: var(--ink-2); }
+
+.notice { position: absolute; left: 50%; top: 0; transform: translateX(-50%); max-width: min(520px, 100%); }
+.chip {
+  background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 10px; padding: 8px 12px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); line-height: 1.5;
+}
+.chip.err { border-color: #c4453b; }
+.chip b { font-weight: 600; }
+
+.bottom { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.rail {
+  display: flex; gap: 4px; padding: 5px; background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 14px;
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); max-width: 100%; overflow-x: auto; scrollbar-width: none;
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail .sep { width: 1px; background: var(--line); margin: 6px 3px; flex: none; }
+.tool {
+  font: inherit; font-size: 10.5px; color: var(--ink); background: none; border: 0; border-radius: 10px; cursor: pointer;
+  min-width: 54px; min-height: 52px; padding: 4px 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: none;
+}
+.tool svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tool[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.tool:active { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+.subpanel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.seg button { font: inherit; font-family: var(--font-num); min-width: 42px; min-height: 38px; background: none; color: var(--ink); border: 0; border-right: 1px solid var(--line); cursor: pointer; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--cut); color: #fff; }
+.subpanel input[type=range] { width: min(320px, 50vw); accent-color: var(--cut); height: 38px; }
+.subpanel .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+.subpanel .mini { font: inherit; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); cursor: pointer; }
+.measure-out { font-family: var(--font-num); font-variant-numeric: tabular-nums; display: grid; grid-template-columns: auto auto auto; gap: 2px 14px; font-size: 12px; }
+.measure-out .big { grid-column: 1 / -1; font-size: 18px; font-weight: 500; }
+.measure-out .k { color: var(--ink-2); }
+
+#mlabel { position: fixed; left: 0; top: 0; pointer-events: none; transform: translate(-50%, -130%); font-family: var(--font-num); font-size: 12px;
+  background: var(--ink); color: var(--panel-solid); padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--sky-bottom) 55%, transparent); z-index: 5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.overlay .card { background: var(--panel-solid); border: 1px solid var(--line); box-shadow: var(--shadow); border-radius: 14px; padding: 20px 22px; width: min(380px, 100%); }
+.overlay .card h3 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.overlay .card p { margin: 0 0 12px; color: var(--ink-2); line-height: 1.5; overflow-wrap: anywhere; }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.drop-hint { position: fixed; inset: 10px; border: 2px dashed var(--accent); border-radius: 16px; z-index: 6; pointer-events: none; display: grid; place-items: center; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--panel-solid) 60%, transparent); }
+@media (max-width: 560px) {
+  .titleblock { font-size: 11px; }
+  .titleblock .hide-narrow { display: none; }
+  .btn .txt { display: none; }
+  .btn { padding: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+
+</head>
+<body>
+<div id="stage" aria-label="3Dビュー"></div>
+
+<div class="chrome">
+  <div class="top">
+    <div class="titleblock hit" id="titleblock">
+      <div class="cell name"><span class="k">ファイル</span><span class="v" id="tb-name">サンプル部品</span></div>
+      <div class="cell"><span class="k">外形寸法 W×D×H</span><span class="v" id="tb-size">—</span></div>
+      <div class="cell"><span class="k">表示中の部品</span><span class="v" id="tb-count">—</span></div>
+      <div class="cell hide-narrow"><span class="k">作成バージョン</span><span class="v" id="tb-ver">—</span></div>
+      <div class="cell hide-narrow"><span class="k">単位</span><span class="v">mm</span></div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btn-parts" aria-pressed="false" aria-controls="drawer">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="txt">部品</span>
+      </button>
+      <button class="btn primary" id="btn-open">
+        <svg viewBox="0 0 24 24"><path d="M4 7h6l2 2h8v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/></svg><span class="txt">FCStdを開く</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="middle">
+    <aside class="drawer hit" id="drawer" hidden>
+      <header><h2>部品一覧</h2><span class="count" id="drawer-count"></span></header>
+      <div class="bulk"><button id="all-on">すべて表示</button><button id="all-def">保存時の表示に戻す</button></div>
+      <ul class="parts" id="parts"></ul>
+    </aside>
+    <div class="notice" id="notice" hidden></div>
+  </div>
+
+  <div class="bottom">
+    <div class="subpanel chip hit" id="sec-panel" hidden>
+      <div class="seg" role="group" aria-label="断面の向き">
+        <button data-axis="x" aria-pressed="false">X</button><button data-axis="y" aria-pressed="false">Y</button><button data-axis="z" aria-pressed="true">Z</button>
+      </div>
+      <input type="range" id="sec-range" min="0" max="1000" value="500" aria-label="断面の位置">
+      <span class="num" id="sec-val">0.00 mm</span>
+      <button class="mini" id="sec-flip">反転</button>
+    </div>
+    <div class="subpanel chip hit" id="meas-panel" hidden>
+      <div class="measure-out" id="meas-out"><span class="big">面上の2点をタップしてください</span></div>
+      <button class="mini" id="meas-clear">消去</button>
+    </div>
+    <nav class="rail hit" aria-label="表示操作">
+      <button class="tool" id="t-fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><rect x="9" y="9" width="6" height="6"/></svg>全体</button>
+      <span class="sep"></span>
+      <button class="tool" data-view="iso"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z M12 12l8-4.5 M12 12v9 M12 12L4 7.5"/></svg>等角</button>
+      <button class="tool" data-view="front"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/><path d="M12 9v6M9 12h6"/></svg>正面</button>
+      <button class="tool" data-view="top"><svg viewBox="0 0 24 24"><path d="M4 9l8-4 8 4-8 4z"/><path d="M4 9v1M20 9v1" opacity=".5"/></svg>上面</button>
+      <button class="tool" data-view="right"><svg viewBox="0 0 24 24"><path d="M9 4l8 4v12l-8-4z"/></svg>右側面</button>
+      <button class="tool" data-view="back"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" stroke-dasharray="2 2"/></svg>背面</button>
+      <span class="sep"></span>
+      <button class="tool" id="t-sec" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M3 13l18-3" stroke-width="2"/></svg>断面</button>
+      <button class="tool" id="t-meas" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>計測</button>
+      <button class="tool" id="t-mode"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span id="mode-lbl">稜線あり</span></button>
+    </nav>
+  </div>
+</div>
+
+<div id="mlabel" hidden></div>
+<input type="file" id="file" hidden>
+<div class="overlay" id="loading" hidden><div class="card"><h3 id="ld-title">読み込み中</h3><p id="ld-msg"></p><div class="bar"><i id="ld-bar"></i></div></div></div>
+<div class="drop-hint" id="drop" hidden>ここにFCStdファイルをドロップ</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* FCStd reader core: parses Document.xml / GuiDocument.xml and decides what to draw.
+   Works in the browser (globals) and in node (module.exports) for testing. */
+(function (root) {
+  'use strict';
+
+  const SKIP_TYPE = /^(Sketcher::|App::Origin|App::Line|App::Plane|App::Point|PartDesign::(Plane|Line|Point|CoordinateSystem|ShapeBinder|SubShapeBinder)|Part::Part2DObject|Spreadsheet::|TechDraw::|Fem::|Mesh::|Points::|App::Annotation|App::MeasureDistance)/;
+  const CONTAINER_TYPE = /^(App::Part|App::DocumentObjectGroup)/;
+
+  function kids(el, tag) {
+    const out = [];
+    for (let n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 1 && (!tag || n.nodeName === tag)) out.push(n);
+    return out;
+  }
+  function first(el, tag) { return kids(el, tag)[0] || null; }
+
+  function readProps(objEl) {
+    const map = {};
+    const propsEl = first(objEl, 'Properties');
+    if (!propsEl) return map;
+    for (const p of kids(propsEl, 'Property')) map[p.getAttribute('name')] = p;
+    // Extensions (e.g. GroupExtension) keep properties in the same list in practice
+    return map;
+  }
+
+  function propValue(p) {
+    if (!p) return undefined;
+    const c = kids(p)[0];
+    if (!c) return undefined;
+    switch (c.nodeName) {
+      case 'String': return c.getAttribute('value');
+      case 'Bool': return c.getAttribute('value') === 'true';
+      case 'Integer': return parseInt(c.getAttribute('value'), 10);
+      case 'Float': return parseFloat(c.getAttribute('value'));
+      case 'PropertyColor': return Number(c.getAttribute('value')) >>> 0;
+      case 'Part': return { file: c.getAttribute('file') || '' };
+      case 'Link': return c.getAttribute('value') || '';
+      case 'LinkList': return kids(c, 'Link').map(l => l.getAttribute('value')).filter(Boolean);
+      case 'XLink': return c.getAttribute('file') ? null : (c.getAttribute('name') || '');
+      case 'XLinkSub': return c.getAttribute('file') ? null : (c.getAttribute('name') || '');
+      case 'PropertyPlacement': {
+        const a = k => parseFloat(c.getAttribute(k) || '0');
+        return { p: [a('Px'), a('Py'), a('Pz')], q: [a('Q0'), a('Q1'), a('Q2'), c.hasAttribute('Q3') ? a('Q3') : 1] };
+      }
+      case 'ColorList': return { file: c.getAttribute('file') || '' };
+      case 'MaterialList': return { file: c.getAttribute('file') || '', version: parseInt(c.getAttribute('version') || '0', 10) };
+      case 'PropertyMaterial': return { diffuse: Number(c.getAttribute('diffuseColor')) >>> 0, transparency: parseFloat(c.getAttribute('transparency') || '0') };
+      default: return c.getAttribute('value');
+    }
+  }
+
+  function unpackColor(u) { return [((u >>> 24) & 255) / 255, ((u >>> 16) & 255) / 255, ((u >>> 8) & 255) / 255]; }
+
+  function readU32List(bytes) {
+    if (!bytes || bytes.length < 4) return null;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const n = dv.getUint32(0, true);
+    if (n === 0 || 4 + n * 4 > bytes.length) return null;
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(dv.getUint32(4 + i * 4, true));
+    return out;
+  }
+
+  // App::PropertyMaterialList (FreeCAD 1.x): count, then per material
+  // ambient, diffuse, specular, emissive (u32), shininess, transparency (f32), then optional strings.
+  function readMaterialList(bytes, version) {
+    if (!bytes || bytes.length < 4) return null;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const n = dv.getUint32(0, true);
+    if (n === 0 || n > 1e6) return null;
+    let off = 4;
+    const out = [];
+    try {
+      for (let i = 0; i < n; i++) {
+        dv.getUint32(off, true); const diffuse = dv.getUint32(off + 4, true);
+        const transparency = dv.getFloat32(off + 20, true);
+        off += 24;
+        if (version >= 2) {
+          // image, image path, uuid: each a length-prefixed string
+          const strings = version >= 3 ? 3 : 2;
+          for (let s = 0; s < strings; s++) { const len = dv.getUint32(off, true); off += 4 + len; }
+        }
+        out.push({ diffuse, transparency });
+      }
+    } catch (e) {
+      if (!out.length) return null;
+    }
+    return out;
+  }
+
+  function parseXml(text, DOMParserCtor) {
+    const doc = new DOMParserCtor().parseFromString(text, 'text/xml');
+    return doc.documentElement;
+  }
+
+  /**
+   * @param files  Map<string, Uint8Array>
+   * @returns {label, version, objects: Map, items: [...] , notes: []}
+   */
+  function analyze(files, DOMParserCtor) {
+    const dec = new TextDecoder('utf-8');
+    const docBytes = files.get('Document.xml');
+    if (!docBytes) throw new Error('Document.xml が見つかりません。FreeCADのファイル(.FCStd)ではない可能性があります。');
+    const docRoot = parseXml(dec.decode(docBytes), DOMParserCtor);
+    const guiBytes = files.get('GuiDocument.xml');
+    const guiRoot = guiBytes ? parseXml(dec.decode(guiBytes), DOMParserCtor) : null;
+
+    const version = docRoot.getAttribute('ProgramVersion') || '';
+    const docProps = readProps(docRoot);
+    const label = propValue(docProps.Label) || '';
+
+    const objects = new Map();
+    const objsEl = first(docRoot, 'Objects');
+    if (objsEl) for (const o of kids(objsEl, 'Object')) objects.set(o.getAttribute('name'), { name: o.getAttribute('name'), type: o.getAttribute('type') || '' });
+
+    const dataEl = first(docRoot, 'ObjectData');
+    if (dataEl) for (const o of kids(dataEl, 'Object')) {
+      const ob = objects.get(o.getAttribute('name'));
+      if (!ob) continue;
+      const P = readProps(o);
+      ob.label = propValue(P.Label) || ob.name;
+      const shp = propValue(P.Shape);
+      ob.shapeFile = shp && shp.file ? shp.file : null;
+      ob.placement = propValue(P.Placement) || null;
+      ob.group = propValue(P.Group) || [];
+      if (P.Visibility) ob.docVisible = propValue(P.Visibility);
+      if (ob.type.startsWith('App::Link')) {
+        ob.linked = propValue(P.LinkedObject) || null;
+        ob.linkTransform = propValue(P.LinkTransform) === true;
+        ob.linkPlacement = propValue(P.LinkPlacement) || ob.placement;
+      }
+      if (ob.type === 'PartDesign::Body') ob.tip = propValue(P.Tip) || null;
+      // collect every linked name, for the "leaf" fallback
+      ob.refs = [];
+      for (const k in P) {
+        const v = propValue(P[k]);
+        if (typeof v === 'string' && objects.has(v) && /Link/.test(P[k].getAttribute('type') || '')) ob.refs.push(v);
+        else if (Array.isArray(v)) ob.refs.push(...v.filter(x => objects.has(x)));
+      }
+      if (P.Base) { const v = first(P.Base, 'Link'); if (v) ob.refs.push(v.getAttribute('value')); }
+    }
+
+    if (guiRoot) {
+      const vpd = first(guiRoot, 'ViewProviderData');
+      if (vpd) for (const v of kids(vpd, 'ViewProvider')) {
+        const ob = objects.get(v.getAttribute('name'));
+        if (!ob) continue;
+        const P = readProps(v);
+        if (P.Visibility) ob.guiVisible = propValue(P.Visibility);
+        if (P.ShapeColor) ob.color = unpackColor(propValue(P.ShapeColor));
+        if (P.Transparency) ob.transparency = (propValue(P.Transparency) || 0) / 100;
+        if (P.DiffuseColor) {
+          const f = propValue(P.DiffuseColor);
+          const list = f && files.get(f.file) ? readU32List(files.get(f.file)) : null;
+          if (list && list.length > 1) ob.faceColors = list.map(unpackColor);
+          else if (list && list.length === 1 && !P.ShapeColor) ob.color = unpackColor(list[0]);
+        }
+        if (P.ShapeAppearance) {
+          const f = propValue(P.ShapeAppearance);
+          const list = f && files.get(f.file) ? readMaterialList(files.get(f.file), f.version) : null;
+          if (list && list.length) {
+            if (!P.ShapeColor) ob.color = unpackColor(list[0].diffuse);
+            if (!P.Transparency && list[0].transparency > 0) ob.transparency = list[0].transparency;
+            if (list.length > 1) ob.faceColors = list.map(m => unpackColor(m.diffuse));
+          }
+        }
+      }
+    }
+
+    // parents
+    for (const ob of objects.values()) for (const c of ob.group || []) {
+      const ch = objects.get(c);
+      if (ch && !ch.parent && c !== ob.name) ch.parent = ob.name;
+    }
+    const referenced = new Set();
+    for (const ob of objects.values()) for (const r of ob.refs || []) referenced.add(r);
+
+    const anyVis = [...objects.values()].some(o => o.guiVisible !== undefined || o.docVisible !== undefined);
+    function isVisible(ob) {
+      if (ob.guiVisible !== undefined) return ob.guiVisible;
+      if (ob.docVisible !== undefined) return ob.docVisible;
+      if (!anyVis) return !referenced.has(ob.name);
+      return false;
+    }
+
+    const items = [];
+    const notes = [];
+    const IDENT = { p: [0, 0, 0], q: [0, 0, 0, 1] };
+
+    function walk(ob, chain, hiddenByParent, path, depth) {
+      if (!ob || depth > 40) return;
+      if (SKIP_TYPE.test(ob.type)) return;
+      const vis = isVisible(ob) && !hiddenByParent;
+
+      if (ob.type.startsWith('App::Link')) {
+        const target = ob.linked ? objects.get(ob.linked) : null;
+        if (!target) { if (ob.linked === null) notes.push('外部ファイルへのリンク「' + ob.label + '」は表示できません'); return; }
+        const lp = ob.linkPlacement || IDENT;
+        if (target.type.startsWith('App::Part') || (target.group && target.group.length && !target.shapeFile)) {
+          for (const c of target.group) walk(objects.get(c), chain.concat([lp]), !vis, path + '/' + ob.name, depth + 1);
+        } else if (target.shapeFile) {
+          // link placement replaces the target's own placement unless LinkTransform is on
+          const extra = ob.linkTransform ? [lp] : [lp, { inv: target.placement || IDENT }];
+          items.push(makeItem(target, ob, chain.concat(extra), vis, path + '/' + ob.name));
+        }
+        return;
+      }
+
+      if (ob.type.startsWith('App::Part')) {
+        const pl = ob.placement || IDENT;
+        for (const c of ob.group) walk(objects.get(c), chain.concat([pl]), !vis, path + '/' + ob.name, depth + 1);
+        return;
+      }
+
+      if (ob.type === 'PartDesign::Body') {
+        if (ob.shapeFile) items.push(makeItem(ob, ob, chain, vis, path + '/' + ob.name));
+        return;
+      }
+
+      if (ob.shapeFile) items.push(makeItem(ob, ob, chain, vis, path + '/' + ob.name));
+      // plain groups and Arch containers: keep walking (visibility of a plain group doesn't hide children)
+      if (ob.group && ob.group.length) {
+        const hides = !CONTAINER_TYPE.test(ob.type) ? false : false;
+        for (const c of ob.group) walk(objects.get(c), chain, hiddenByParent || hides, path + '/' + ob.name, depth + 1);
+      }
+    }
+
+    function makeItem(shapeOb, viewOb, chain, visible, key) {
+      let group = '';
+      let p = viewOb.parent ? objects.get(viewOb.parent) : null;
+      while (p && !group) { if (/^(App::Part|App::DocumentObjectGroup|Arch|BuildingPart)/.test(p.type) || p.group) group = p.label; p = p.parent ? objects.get(p.parent) : null; }
+      return {
+        key, name: viewOb.name, label: viewOb.label || viewOb.name, type: shapeOb.type,
+        shapeFile: shapeOb.shapeFile, chain, visible,
+        color: shapeOb.color || [0.8, 0.8, 0.8], transparency: shapeOb.transparency || 0,
+        faceColors: shapeOb.faceColors || null, group
+      };
+    }
+
+    for (const ob of objects.values()) if (!ob.parent) walk(ob, [], false, '', 0);
+
+    // de-duplicate identical keys
+    const seen = new Set();
+    const uniq = items.filter(it => (seen.has(it.key) ? false : (seen.add(it.key), true)));
+
+    for (const it of uniq) if (it.shapeFile && !files.has(it.shapeFile)) it.missing = true;
+    const bin = uniq.filter(it => it.shapeFile && /\.bin$/i.test(it.shapeFile));
+    if (bin.length) notes.push('バイナリ形式で保存された形状が ' + bin.length + ' 件あり、表示できない可能性があります');
+
+    return { label, version, objects, items: uniq, notes };
+  }
+
+  // Compose a placement chain into a 4x4 column-major matrix using THREE
+  function chainMatrix(THREE, chain) {
+    const m = new THREE.Matrix4();
+    for (const c of chain) {
+      const pl = c.inv || c;
+      const t = new THREE.Matrix4().compose(new THREE.Vector3(...pl.p), new THREE.Quaternion(...pl.q).normalize(), new THREE.Vector3(1, 1, 1));
+      if (c.inv) t.invert();
+      m.multiply(t);
+    }
+    return m;
+  }
+
+  const api = { analyze, chainMatrix, readMaterialList, readU32List };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FCStdCore = api;
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+<script>
+(function () {
+'use strict';
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---------- scene ----------
+const stage = $('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.localClippingEnabled = true;
+renderer.outputEncoding = THREE.sRGBEncoding;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 1e6);
+camera.up.set(0, 0, 1);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = true;
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.75));
+const key = new THREE.DirectionalLight(0xffffff, 0.75);
+camera.add(key); key.position.set(0.4, 0.8, 1); scene.add(camera);
+
+const model = new THREE.Group(); scene.add(model);
+const helpers = new THREE.Group(); scene.add(helpers);
+
+const clip = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+let clipOn = false;
+
+let edgeMode = 0; // 0 shaded+edges, 1 shaded, 2 wire
+const MODES = ['稜線あり', '陰影のみ', 'ワイヤー'];
+let parts = [];   // {id,label,type,group,color,transparency,visible,defVisible,obj,load,loading}
+let selected = null;
+let docInfo = { name: 'サンプル部品', version: '—', sample: true };
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / Math.max(h, 1); camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+// ---------- materials & part objects ----------
+function edgeColor() { return new THREE.Color(css('--edge') || '#1b2530'); }
+function cutColor() { return new THREE.Color(css('--cut') || '#d9822b'); }
+
+function buildObject(geoms, color, transparency, faceColors) {
+  // geoms: [{geometry, groups?:[{start,count,colorIndex}]}]
+  const g = new THREE.Group();
+  const base = new THREE.Color().setRGB(color[0], color[1], color[2]).convertSRGBToLinear();
+  const mkMat = c => new THREE.MeshPhongMaterial({
+    color: c, shininess: 18, specular: 0x222222, side: THREE.FrontSide,
+    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    transparent: transparency > 0.01, opacity: 1 - transparency, depthWrite: transparency <= 0.01, clippingPlanes: []
+  });
+  const mats = [mkMat(base)];
+  const palette = new Map();
+  if (faceColors) faceColors.forEach((fc, i) => {
+    const k = fc.map(v => v.toFixed(3)).join();
+    if (!palette.has(k)) { palette.set(k, mats.length); mats.push(mkMat(new THREE.Color().setRGB(fc[0], fc[1], fc[2]).convertSRGBToLinear())); }
+  });
+  const capMat = new THREE.MeshBasicMaterial({ color: cutColor(), side: THREE.BackSide, clippingPlanes: [] });
+  const lineMat = new THREE.LineBasicMaterial({ color: edgeColor(), clippingPlanes: [] });
+  for (const gd of geoms) {
+    const geo = gd.geometry;
+    if (!geo.attributes.normal) geo.computeVertexNormals();
+    let useMats = mats[0];
+    if (gd.groups && faceColors) {
+      geo.clearGroups();
+      for (const gr of gd.groups) {
+        const fc = faceColors[gr.colorIndex];
+        const mi = fc ? palette.get(fc.map(v => v.toFixed(3)).join()) : 0;
+        geo.addGroup(gr.start, gr.count, mi);
+      }
+      useMats = mats;
+    }
+    const mesh = new THREE.Mesh(geo, useMats); mesh.userData.pick = true; g.add(mesh);
+    const cap = new THREE.Mesh(geo, capMat); cap.userData.cap = true; cap.visible = false; cap.renderOrder = -1; g.add(cap);
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), lineMat); edges.userData.edge = true; g.add(edges);
+  }
+  g.userData.mats = mats; g.userData.capMat = capMat; g.userData.lineMat = lineMat;
+  return g;
+}
+
+function applyLook(obj) {
+  if (!obj) return;
+  const planes = clipOn ? [clip] : [];
+  for (const m of obj.userData.mats) { m.clippingPlanes = planes; m.wireframe = edgeMode === 2; m.needsUpdate = true; }
+  obj.userData.capMat.clippingPlanes = planes; obj.userData.capMat.color.copy(cutColor());
+  obj.userData.lineMat.clippingPlanes = planes; obj.userData.lineMat.color.copy(edgeColor());
+  obj.children.forEach(c => {
+    if (c.userData.edge) c.visible = edgeMode === 0;
+    if (c.userData.cap) c.visible = clipOn && edgeMode !== 2;
+  });
+}
+
+function setSelectedLook(p, on) {
+  if (!p || !p.obj) return;
+  for (const m of p.obj.userData.mats) m.emissive.setHex(on ? 0x1d3f8f : 0x000000);
+}
+
+// ---------- sample model (shown before any file is opened) ----------
+function sampleParts() {
+  const plate = new THREE.Shape();
+  plate.moveTo(0, 0); plate.lineTo(120, 0); plate.lineTo(120, 80); plate.lineTo(0, 80); plate.closePath();
+  for (const [x, y] of [[14, 14], [106, 14], [14, 66], [106, 66]]) { const h = new THREE.Path(); h.absarc(x, y, 5.5, 0, Math.PI * 2, true); plate.holes.push(h); }
+  const plateG = new THREE.ExtrudeGeometry(plate, { depth: 10, bevelEnabled: false, curveSegments: 40 });
+
+  const up = new THREE.Shape();
+  up.moveTo(0, 0); up.lineTo(80, 0); up.lineTo(80, 50); up.absarc(40, 50, 40, 0, Math.PI, false); up.lineTo(0, 0);
+  const uh = new THREE.Path(); uh.absarc(40, 50, 16, 0, Math.PI * 2, true); up.holes.push(uh);
+  const upG = new THREE.ExtrudeGeometry(up, { depth: 12, bevelEnabled: false, curveSegments: 48 });
+  upG.rotateX(Math.PI / 2); upG.rotateZ(Math.PI / 2); upG.translate(42, 0, 10);
+
+  const rib = new THREE.Shape(); rib.moveTo(0, 0); rib.lineTo(44, 0); rib.lineTo(0, 46); rib.closePath();
+  const ribG = (y) => { const g = new THREE.ExtrudeGeometry(rib, { depth: 8, bevelEnabled: false }); g.rotateX(Math.PI / 2); g.translate(42, y + 8, 10); return g; };
+
+  const bush = new THREE.CylinderGeometry(16, 16, 30, 48, 1, false); bush.rotateZ(Math.PI / 2); bush.translate(39, 40, 60);
+  const bolts = [];
+  for (const [x, y] of [[14, 14], [106, 14], [14, 66], [106, 66]]) {
+    const head = new THREE.CylinderGeometry(8.5, 8.5, 5.5, 6); head.rotateX(Math.PI / 2); head.translate(x, y, 12.75);
+    bolts.push(head);
+  }
+  return [
+    { label: 'ベースプレート', type: 'PartDesign::Body', group: 'ブラケット', color: [0.62, 0.66, 0.72], geoms: [plateG] },
+    { label: '立ち上がり', type: 'PartDesign::Body', group: 'ブラケット', color: [0.62, 0.66, 0.72], geoms: [upG] },
+    { label: 'リブ (2)', type: 'PartDesign::Body', group: 'ブラケット', color: [0.55, 0.6, 0.67], geoms: [ribG(4), ribG(76 - 8 - 8)] },
+    { label: 'ブッシュ', type: 'Part::Cylinder', group: '軸受', color: [0.78, 0.6, 0.28], geoms: [bush], transparency: 0 },
+    { label: '六角ボルト M10 ×4', type: 'Part::Feature', group: '締結部品', color: [0.33, 0.36, 0.4], geoms: bolts }
+  ].map((s, i) => ({ id: 's' + i, label: s.label, type: s.type, group: s.group, color: s.color, transparency: s.transparency || 0, visible: true, defVisible: true,
+    load: async () => buildObject(s.geoms.map(g => ({ geometry: g })), s.color, s.transparency || 0, null) }));
+}
+
+// ---------- OpenCascade (loaded on first file) ----------
+let occtPromise = null;
+function getOcct() {
+  if (!occtPromise) {
+    occtPromise = (async () => {
+      if (!window.occtimportjs) await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/occt-import-js@0.0.22/dist/occt-import-js.js';
+        s.onload = res; s.onerror = () => rej(new Error('形状エンジンを読み込めませんでした。通信状況を確認してください。'));
+        document.head.appendChild(s);
+      });
+      const r = await fetch('occt-import-js.wasm');
+      if (!r.ok) throw new Error('形状エンジン(wasm)を読み込めませんでした。');
+      const wasmBinary = await r.arrayBuffer();
+      return await window.occtimportjs({ wasmBinary });
+    })();
+    occtPromise.catch(() => { occtPromise = null; });
+  }
+  return occtPromise;
+}
+
+function meshBrep(occt, bytes, item) {
+  const res = occt.ReadBrepFile(bytes, { linearDeflectionType: 'bounding_box_ratio', linearDeflection: 0.0015, angularDeflection: 0.35 });
+  if (!res || !res.success) throw new Error('形状を読めませんでした');
+  const geoms = [];
+  let faceCount = 0;
+  for (const m of res.meshes) faceCount += (m.brep_faces || []).length;
+  const useFaces = item.faceColors && item.faceColors.length === faceCount;
+  let faceIdx = 0;
+  const M = FCStdCore.chainMatrix(THREE, item.chain);
+  for (const m of res.meshes) {
+    if (!m.index || !m.index.array.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(m.attributes.position.array, 3));
+    if (m.attributes.normal) geo.setAttribute('normal', new THREE.Float32BufferAttribute(m.attributes.normal.array, 3));
+    geo.setIndex(m.index.array);
+    geo.applyMatrix4(M);
+    let groups = null;
+    if (useFaces) { groups = (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })); }
+    geoms.push({ geometry: geo, groups });
+  }
+  return geoms;
+}
+
+// ---------- open file ----------
+async function openFile(file) {
+  if (!file) return;
+  showLoading('ファイルを開いています', file.name, 0.05);
+  try {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    if (buf[0] !== 0x50 || buf[1] !== 0x4b) throw new Error('FreeCADのファイル(.FCStd)ではないようです。FreeCADで保存した .FCStd を選んでください。');
+    const zip = await JSZip.loadAsync(buf);
+    const files = new Map();
+    const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+    for (const n of names) files.set(n, await zip.files[n].async('uint8array'));
+    showLoading('ファイルを開いています', '構成を解析しています', 0.15);
+    const info = FCStdCore.analyze(files, DOMParser);
+    showLoading('形状エンジンを準備しています', '初回のみ数秒かかります', 0.25);
+    const occt = await getOcct();
+
+    const newParts = info.items.filter(it => it.shapeFile && !it.missing).map((it, i) => ({
+      id: 'f' + i, label: it.label, type: it.type, group: it.group, color: it.color, transparency: it.transparency,
+      visible: it.visible, defVisible: it.visible,
+      load: async () => buildObject(meshBrep(occt, files.get(it.shapeFile), it), it.color, it.transparency, it.faceColors)
+    }));
+    clearModel();
+    parts = newParts;
+    docInfo = { name: (info.label || file.name.replace(/\.fcstd$/i, '')), file: file.name, version: (info.version.match(/^[\d.]+/) || ['—'])[0], sample: false };
+    const vis = parts.filter(p => p.visible);
+    let done = 0, failed = 0;
+    for (const p of vis) {
+      showLoading('形状を読み込んでいます', `${p.label}  (${done + 1}/${vis.length})`, 0.3 + 0.7 * done / Math.max(vis.length, 1));
+      await new Promise(r => setTimeout(r, 16));
+      try { await ensureLoaded(p, false); } catch (e) { failed++; p.visible = false; p.error = true; }
+      done++;
+    }
+    hideLoading();
+    renderParts(); updateTitle(); fitView('iso');
+    const msgs = [...info.notes];
+    if (failed) msgs.push(`${failed} 件の形状を読み込めませんでした`);
+    if (!parts.length) msgs.push('このファイルには表示できる立体がありません(スケッチのみ等)');
+    else if (!vis.length) msgs.push('保存時にすべて非表示になっていました。「部品」から表示する部品を選んでください');
+    showNotice(msgs.join('。'), false, 6000);
+  } catch (e) {
+    hideLoading();
+    showNotice(e.message || String(e), true, 8000);
+  }
+}
+
+async function ensureLoaded(p, fit) {
+  if (p.obj || p.loading) return;
+  p.loading = true;
+  try {
+    p.obj = await p.load();
+    p.obj.userData.part = p;
+    applyLook(p.obj);
+    model.add(p.obj);
+  } finally { p.loading = false; }
+  p.obj.visible = p.visible;
+  if (fit) updateTitle();
+}
+
+function clearModel() {
+  for (const p of parts) if (p.obj) {
+    model.remove(p.obj);
+    p.obj.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+  }
+  selected = null; clearMeasure();
+}
+
+// ---------- UI: parts drawer ----------
+function hex(c) { return '#' + c.map(v => Math.round(v * 255).toString(16).padStart(2, '0')).join(''); }
+function renderParts() {
+  const ul = $('parts'); ul.innerHTML = '';
+  const order = [...parts].sort((a, b) => (b.defVisible - a.defVisible) || (a.group || '').localeCompare(b.group || ''));
+  let lastGroup = null;
+  let shownHiddenHdr = false;
+  for (const p of order) {
+    if (!p.defVisible && !shownHiddenHdr) { shownHiddenHdr = true; lastGroup = null; const h = document.createElement('li'); h.className = 'grp'; h.textContent = '保存時に非表示だったもの'; ul.appendChild(h); }
+    if (p.defVisible && p.group !== lastGroup && p.group) { const h = document.createElement('li'); h.className = 'grp'; h.textContent = p.group; ul.appendChild(h); }
+    if (p.defVisible) lastGroup = p.group;
+    const li = document.createElement('li'); li.className = 'part' + (selected === p ? ' sel' : ''); li.dataset.id = p.id;
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = p.visible; cb.id = 'cb-' + p.id; cb.disabled = !!p.error;
+    cb.setAttribute('aria-label', p.label + 'を表示');
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => setVisible(p, cb.checked));
+    const sw = document.createElement('span'); sw.className = 'sw'; sw.style.background = hex(p.color);
+    const lb = document.createElement('span'); lb.className = 'lbl'; lb.textContent = p.label;
+    const ty = document.createElement('span'); ty.className = 'ty'; ty.textContent = p.error ? '読み込めませんでした' : p.type; lb.appendChild(ty);
+    li.append(cb, sw, lb);
+    li.addEventListener('click', () => { select(p); if (p.obj && p.visible) focusOn(p.obj); });
+    ul.appendChild(li);
+  }
+  $('drawer-count').textContent = `${parts.filter(p => p.visible).length} / ${parts.length}`;
+}
+
+async function setVisible(p, v) {
+  p.visible = v;
+  if (v && !p.obj) {
+    const li = document.querySelector(`.part[data-id="${p.id}"] .ty`); if (li) li.textContent = '読み込み中…';
+    try { await ensureLoaded(p, true); } catch (e) { p.error = true; p.visible = false; showNotice(`「${p.label}」の形状を読み込めませんでした`, true, 5000); }
+  }
+  if (p.obj) p.obj.visible = p.visible;
+  if (!v && selected === p) select(null);
+  renderParts(); updateTitle(); updateSection();
+}
+
+function select(p) {
+  if (selected) setSelectedLook(selected, false);
+  selected = (selected === p) ? null : p;
+  if (selected) setSelectedLook(selected, true);
+  document.querySelectorAll('.part').forEach(li => li.classList.toggle('sel', !!selected && li.dataset.id === selected.id));
+  if (selected) showNotice(`<b>${escapeHtml(selected.label)}</b>  ${escapeHtml(selected.type)}${selected.group ? '  ·  ' + escapeHtml(selected.group) : ''}`, false, 0, true);
+  else hideNotice();
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+// ---------- title block ----------
+function visibleBox() {
+  const box = new THREE.Box3();
+  for (const p of parts) if (p.obj && p.visible) box.expandByObject(p.obj);
+  return box;
+}
+const fmt = v => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2));
+function updateTitle() {
+  $('tb-name').innerHTML = escapeHtml(docInfo.name) + (docInfo.sample ? '<span class="badge">サンプル</span>' : '');
+  $('tb-ver').textContent = docInfo.sample ? '—' : 'FreeCAD ' + docInfo.version;
+  const box = visibleBox();
+  if (box.isEmpty()) $('tb-size').textContent = '—';
+  else { const s = box.getSize(new THREE.Vector3()); $('tb-size').textContent = `${fmt(s.x)} × ${fmt(s.y)} × ${fmt(s.z)}`; }
+  $('tb-count').textContent = `${parts.filter(p => p.visible).length} / ${parts.length}`;
+}
+
+// ---------- camera ----------
+const VIEWS = { iso: [1, -1, 0.8], front: [0, -1, 0], back: [0, 1, 0], top: [0, 0, 1], right: [1, 0, 0] };
+function fitView(view, box, immediate) {
+  box = box || visibleBox();
+  if (box.isEmpty()) box = new THREE.Box3(new THREE.Vector3(-50, -50, -50), new THREE.Vector3(50, 50, 50));
+  const c = box.getCenter(new THREE.Vector3());
+  const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1);
+  const dir = view ? new THREE.Vector3(...VIEWS[view]).normalize() : camera.position.clone().sub(controls.target).normalize();
+  const dist = r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2)) * (camera.aspect < 1 ? 1.15 / Math.max(camera.aspect, 0.45) : 1.05);
+  camera.up.set(0, 0, 1);
+  if (view === 'top') camera.up.set(0, 1, 0);
+  animateCamera(c.clone().addScaledVector(dir, dist), c, immediate);
+  camera.near = Math.max(dist / 1000, 0.01); camera.far = dist * 100; camera.updateProjectionMatrix();
+  markerScale = r / 90;
+}
+function focusOn(obj) { const b = new THREE.Box3().expandByObject(obj); if (!b.isEmpty()) fitView(null, b); }
+let anim = null;
+function animateCamera(pos, target, immediate) {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || immediate) { camera.position.copy(pos); controls.target.copy(target); controls.update(); return; }
+  anim = { t0: performance.now(), p0: camera.position.clone(), q0: controls.target.clone(), p1: pos, q1: target };
+}
+
+// ---------- section ----------
+let secAxis = 'z', secFlip = false;
+function updateSection() {
+  const box = visibleBox();
+  const axisV = { x: new THREE.Vector3(1, 0, 0), y: new THREE.Vector3(0, 1, 0), z: new THREE.Vector3(0, 0, 1) }[secAxis];
+  const t = $('sec-range').value / 1000;
+  let lo = 0, hi = 0;
+  if (!box.isEmpty()) { lo = box.min[secAxis]; hi = box.max[secAxis]; const pad = (hi - lo) * 0.002; lo -= pad; hi += pad; }
+  const pos = lo + (hi - lo) * t;
+  const n = axisV.clone().multiplyScalar(secFlip ? 1 : -1);
+  clip.setFromNormalAndCoplanarPoint(n, axisV.clone().multiplyScalar(pos));
+  $('sec-val').textContent = `${secAxis.toUpperCase()} = ${pos.toFixed(2)}`;
+}
+function setSection(on) {
+  clipOn = on;
+  $('t-sec').setAttribute('aria-pressed', on); $('sec-panel').hidden = !on;
+  updateSection(); parts.forEach(p => applyLook(p.obj));
+}
+document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+  secAxis = b.dataset.axis; document.querySelectorAll('.seg button').forEach(x => x.setAttribute('aria-pressed', x === b)); updateSection();
+}));
+$('sec-range').addEventListener('input', updateSection);
+$('sec-flip').addEventListener('click', () => { secFlip = !secFlip; updateSection(); });
+
+// ---------- measure ----------
+let measuring = false, mPts = [], markerScale = 1;
+const mMat = new THREE.MeshBasicMaterial({ color: 0xd9822b, depthTest: false });
+const lMat = new THREE.LineBasicMaterial({ color: 0xd9822b, depthTest: false });
+function clearMeasure() {
+  mPts = []; while (helpers.children.length) { const c = helpers.children.pop(); c.geometry && c.geometry.dispose(); }
+  $('mlabel').hidden = true;
+  $('meas-out').innerHTML = '<span class="big">面上の2点をタップしてください</span>';
+}
+function addMeasurePoint(pt) {
+  if (mPts.length >= 2) clearMeasure();
+  mPts.push(pt.clone());
+  mMat.color.copy(cutColor()); lMat.color.copy(cutColor());
+  const s = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), mMat); s.position.copy(pt); s.scale.setScalar(markerScale * 1.6); s.renderOrder = 10; helpers.add(s);
+  if (mPts.length === 2) {
+    const [a, b] = mPts;
+    const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lMat); ln.renderOrder = 10; helpers.add(ln);
+    const d = a.distanceTo(b), dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+    $('meas-out').innerHTML = `<span class="big">${d.toFixed(2)} mm</span><span><span class="k">ΔX </span>${Math.abs(dx).toFixed(2)}</span><span><span class="k">ΔY </span>${Math.abs(dy).toFixed(2)}</span><span><span class="k">ΔZ </span>${Math.abs(dz).toFixed(2)}</span>`;
+    $('mlabel').textContent = d.toFixed(2) + ' mm'; $('mlabel').hidden = false;
+  } else {
+    $('meas-out').innerHTML = `<span class="big">もう1点タップしてください</span>`;
+  }
+}
+function setMeasure(on) {
+  measuring = on; $('t-meas').setAttribute('aria-pressed', on); $('meas-panel').hidden = !on;
+  if (!on) clearMeasure();
+}
+$('meas-clear').addEventListener('click', clearMeasure);
+
+// ---------- picking (tap without drag) ----------
+const ray = new THREE.Raycaster();
+let down = null;
+renderer.domElement.addEventListener('pointerdown', e => { if (e.isPrimary) down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!down || !e.isPrimary) return;
+  const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+  const quick = performance.now() - down.t < 450;
+  down = null;
+  if (moved > 8 || !quick) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  const targets = [];
+  model.traverse(o => { if (o.userData.pick && o.parent.visible) targets.push(o); });
+  const hit = ray.intersectObjects(targets, false).find(h => !clipOn || clip.distanceToPoint(h.point) >= -1e-6);
+  if (measuring) { if (hit) addMeasurePoint(hit.point); return; }
+  const p = hit ? hit.object.parent.userData.part : null;
+  if (p) select(p); else if (selected) select(selected);
+});
+
+// ---------- notices & loading ----------
+let noticeTimer = 0;
+function showNotice(html, err, ms, isHtml) {
+  const n = $('notice');
+  if (!html) { n.hidden = true; return; }
+  n.innerHTML = `<div class="chip hit${err ? ' err' : ''}"></div>`;
+  if (isHtml) n.firstChild.innerHTML = html; else n.firstChild.textContent = html;
+  n.hidden = false; clearTimeout(noticeTimer);
+  if (ms) noticeTimer = setTimeout(() => { n.hidden = true; }, ms);
+}
+function hideNotice() { $('notice').hidden = true; }
+function showLoading(title, msg, frac) { $('loading').hidden = false; $('ld-title').textContent = title; $('ld-msg').textContent = msg || ''; $('ld-bar').style.width = Math.round(frac * 100) + '%'; }
+function hideLoading() { $('loading').hidden = true; }
+
+// ---------- toolbar wiring ----------
+$('btn-open').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; openFile(f); });
+$('btn-parts').addEventListener('click', () => {
+  const d = $('drawer'); d.hidden = !d.hidden; $('btn-parts').setAttribute('aria-pressed', !d.hidden);
+  try { localStorage.setItem('fcv-drawer', d.hidden ? '0' : '1'); } catch (e) {}
+});
+$('all-on').addEventListener('click', async () => { for (const p of parts) if (!p.visible && !p.error) await setVisible(p, true); fitView(null); });
+$('all-def').addEventListener('click', () => { parts.forEach(p => { p.visible = p.defVisible && !p.error; if (p.obj) p.obj.visible = p.visible; }); renderParts(); updateTitle(); updateSection(); });
+$('t-fit').addEventListener('click', () => fitView(null));
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => fitView(b.dataset.view)));
+$('t-sec').addEventListener('click', () => setSection(!clipOn));
+$('t-meas').addEventListener('click', () => setMeasure(!measuring));
+$('t-mode').addEventListener('click', () => { edgeMode = (edgeMode + 1) % 3; $('mode-lbl').textContent = MODES[edgeMode]; parts.forEach(p => applyLook(p.obj)); });
+
+// drag & drop (desktop / iPad split view)
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; $('drop').hidden = false; });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('drop').hidden = true; } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop').hidden = true; const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+
+// theme changes recolor edges / cut faces
+const mq = window.matchMedia('(prefers-color-scheme: dark)');
+const relook = () => setTimeout(() => parts.forEach(p => applyLook(p.obj)), 30);
+mq.addEventListener && mq.addEventListener('change', relook);
+new MutationObserver(relook).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------- loop ----------
+function tick(now) {
+  if (anim) {
+    const k = Math.min((now - anim.t0) / 420, 1), e = 1 - Math.pow(1 - k, 3);
+    camera.position.lerpVectors(anim.p0, anim.p1, e); controls.target.lerpVectors(anim.q0, anim.q1, e);
+    if (k >= 1) anim = null;
+  }
+  controls.update();
+  if (stage.clientWidth !== renderer.domElement.width / renderer.getPixelRatio()) resize();
+  renderer.render(scene, camera);
+  if (mPts.length === 2) {
+    const mid = mPts[0].clone().add(mPts[1]).multiplyScalar(0.5).project(camera);
+    const r = renderer.domElement.getBoundingClientRect();
+    const L = $('mlabel'); L.style.left = (r.left + (mid.x + 1) / 2 * r.width) + 'px'; L.style.top = (r.top + (1 - mid.y) / 2 * r.height) + 'px';
+    L.hidden = mid.z > 1;
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------- start ----------
+(async () => {
+  parts = sampleParts();
+  for (const p of parts) await ensureLoaded(p, false);
+  renderParts(); updateTitle();
+  camera.position.set(300, -300, 240); controls.target.set(60, 40, 30);
+  fitView('iso', null, true);
+  try { if (localStorage.getItem('fcv-drawer') === '1' && window.innerWidth > 700) $('btn-parts').click(); } catch (e) {}
+  requestAnimationFrame(tick);
+  // warm the shape engine in the background so the first file opens quickly
+  const idle = window.requestIdleCallback || (f => setTimeout(f, 1500));
+  idle(() => getOcct().catch(() => {}));
+})();
+})();
+</script>
+
+</body>
+</html>
