@@ -137,6 +137,7 @@ body {
 .seg button[aria-pressed="true"] { background: var(--cut); color: #fff; }
 .subpanel input[type=range] { width: min(320px, 50vw); accent-color: var(--cut); height: 38px; }
 .subpanel .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+#move-val { min-width: 140px; }
 .subpanel .mini { font: inherit; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); cursor: pointer; }
 .measure-out { font-family: var(--font-num); font-variant-numeric: tabular-nums; display: grid; grid-template-columns: auto auto auto; gap: 2px 14px; font-size: 12px; }
 .measure-out .big { grid-column: 1 / -1; font-size: 18px; font-weight: 500; }
@@ -207,6 +208,12 @@ body {
       <div class="measure-out" id="meas-out"><span class="big">面上の2点をタップしてください</span></div>
       <button class="mini" id="meas-clear">消去</button>
     </div>
+    <div class="subpanel chip hit" id="move-panel" hidden>
+      <button class="mini" id="move-close">閉じる</button>
+      <input type="range" id="move-range" min="0" max="1000" step="1" value="0" aria-label="開き具合">
+      <span class="num" id="move-val">0 %</span>
+      <button class="mini" id="move-open">開く</button>
+    </div>
     <nav class="rail hit" aria-label="表示操作">
       <button class="tool" id="t-fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><rect x="9" y="9" width="6" height="6"/></svg>全体</button>
       <span class="sep"></span>
@@ -219,6 +226,8 @@ body {
       <button class="tool" id="t-sec" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M3 13l18-3" stroke-width="2"/></svg>断面</button>
       <button class="tool" id="t-meas" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>計測</button>
       <button class="tool" id="t-mode"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span id="mode-lbl">稜線あり</span></button>
+      <span class="sep" id="t-move-sep" hidden></span>
+      <button class="tool" id="t-move" aria-pressed="false" hidden><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="6"/><path d="M6 11v7h12v-7M10 14.5h4"/><path d="M12 19.5v2M10.5 20.5l1.5 1.5 1.5-1.5"/></svg>開閉</button>
     </nav>
   </div>
 </div>
@@ -282,6 +291,55 @@ body {
     }
   }
 
+  // 選択式のプロパティ（PropertyEnumeration）の、選ばれている文字
+  function enumText(p) {
+    if (!p) return '';
+    const iv = first(p, 'Integer');
+    const list = first(p, 'CustomEnumList');
+    if (!iv || !list) return '';
+    const e = kids(list, 'Enum')[parseInt(iv.getAttribute('value'), 10)];
+    return e ? e.getAttribute('value') || '' : '';
+  }
+
+  /* ---- 動き方（開閉）----
+     部品のプロパティ Motion（文字列。中身は JSON）に書かれた動き方を読む。書式は MOTION_SPEC.md。
+     ビューワーは部品の種類を知らなくてよいので、新しい動く部品を作ってもビューワーを直す必要はない。
+     動き 1 つ = { name, type: 'slide'|'rotate', axis, origin, min, max, value, factorOf(面番号, 面の数) → 倍率 or null } */
+  function num(v, d) { const x = Number(v); return Number.isFinite(x) ? x : d; }
+  function vec3(v, d) { return Array.isArray(v) && v.length === 3 && v.every(x => Number.isFinite(Number(x))) ? v.map(Number) : d; }
+  function parseMotion(text) {
+    const j = JSON.parse(text);
+    const list = Array.isArray(j) ? j : (j && Array.isArray(j.motions) ? j.motions : []);
+    const out = [];
+    for (const m of list) {
+      const type = m.type === 'rotate' ? 'rotate' : m.type === 'slide' ? 'slide' : null;
+      const axis = vec3(m.axis, null);
+      const ranges = Array.isArray(m.faces) ? m.faces.filter(r => Array.isArray(r) && r.length >= 2).map(r => [num(r[0], 0), num(r[1], 0), num(r[2], 1)]) : [];
+      if (!type || !axis || !ranges.length || axis.every(x => x === 0)) continue;
+      const min = num(m.min, 0), max = num(m.max, 0);
+      if (max === min) continue;
+      out.push({
+        name: String(m.name || (type === 'slide' ? '引出し' : '扉')), type, axis,
+        origin: vec3(m.origin, [0, 0, 0]), min, max, value: Math.max(Math.min(num(m.value, min), Math.max(min, max)), Math.min(min, max)),
+        factorOf: f => { for (const r of ranges) if (f >= r[0] && f < r[1]) return r[2]; return null; }
+      });
+    }
+    return out;
+  }
+
+  /* 互換用：Motion を書く前の家具CAD 試作版の部品（Proxy の module で見分け、形の並び順から動きを作る） */
+  const LEGACY_SLIDE = (minFaces, fn) => P => [{
+    name: '引出し', type: 'slide', axis: [0, -1, 0], origin: [0, 0, 0], min: 0, max: 450,
+    value: /開/.test(enumText(P.Extension)) ? 450 : 0,
+    factorOf: (f, n) => (n >= minFaces ? fn(f) : null)
+  }];
+  const LEGACY_MOTIONS = {
+    // ワイヤーシェルフII：左右のレール 24 個の箱（各 6 面。片側 12 個：固定 3・中間 3・内側 6）→ シェルフ
+    'furniture.wire_shelf': LEGACY_SLIDE(145, f => (f < 144 ? [0, 0, 0, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1, 1][Math.floor(f / 6) % 12] : 1)),
+    // フレームバスケットII：下・上のレール 7 個ずつの箱（固定 3・中間 1・動く部材 1・ブラケット 2）→ フレーム・バスケット
+    'furniture.frame_basket': LEGACY_SLIDE(85, f => (f < 84 ? [0, 0, 0, 0.5, 1, 1, 1][Math.floor(f / 6) % 7] : 1))
+  };
+
   function unpackColor(u) { return [((u >>> 24) & 255) / 255, ((u >>> 16) & 255) / 255, ((u >>> 8) & 255) / 255]; }
 
   function readU32List(bytes) {
@@ -343,6 +401,7 @@ body {
     const label = propValue(docProps.Label) || '';
 
     const objects = new Map();
+    const motionErrors = [];
     const objsEl = first(docRoot, 'Objects');
     if (objsEl) for (const o of kids(objsEl, 'Object')) objects.set(o.getAttribute('name'), { name: o.getAttribute('name'), type: o.getAttribute('type') || '' });
 
@@ -363,6 +422,16 @@ body {
         ob.linkPlacement = propValue(P.LinkPlacement) || ob.placement;
       }
       if (ob.type === 'PartDesign::Body') ob.tip = propValue(P.Tip) || null;
+      // 動き方：プロパティ Motion を読む。無ければ、家具CAD 試作版の部品として互換の動きを作る
+      if (P.Motion) {
+        try { const ms = parseMotion(propValue(P.Motion) || ''); if (ms.length) ob.motions = ms; }
+        catch (e) { motionErrors.push(ob.label || ob.name); }
+      }
+      if (!ob.motions) {
+        const py = P.Proxy ? first(P.Proxy, 'Python') : null;
+        const mod = py ? py.getAttribute('module') || '' : '';
+        if (LEGACY_MOTIONS[mod]) ob.motions = LEGACY_MOTIONS[mod](P);
+      }
       // collect every linked name, for the "leaf" fallback
       ob.refs = [];
       for (const k in P) {
@@ -466,7 +535,8 @@ body {
         key, name: viewOb.name, label: viewOb.label || viewOb.name, type: shapeOb.type,
         shapeFile: shapeOb.shapeFile, chain, visible,
         color: shapeOb.color || [0.8, 0.8, 0.8], transparency: shapeOb.transparency || 0,
-        faceColors: shapeOb.faceColors || null, group
+        faceColors: shapeOb.faceColors || null, group, motions: shapeOb.motions || null,
+        ownPlacement: shapeOb.placement || null   // 形状ファイルにすでに入っている、部品自身の配置（開く向きの計算に使う）
       };
     }
 
@@ -480,6 +550,7 @@ body {
     const bin = uniq.filter(it => it.shapeFile && /\.bin$/i.test(it.shapeFile));
     if (bin.length) notes.push('バイナリ形式で保存された形状が ' + bin.length + ' 件あり、表示できない可能性があります');
 
+    if (motionErrors.length) notes.push('動き方（Motion）を読めなかった部品があります：' + motionErrors.join('、'));
     return { label, version, objects, items: uniq, notes };
   }
 
@@ -495,7 +566,7 @@ body {
     return m;
   }
 
-  const api = { analyze, chainMatrix, readMaterialList, readU32List };
+  const api = { analyze, chainMatrix, readMaterialList, readU32List, parseMotion };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FCStdCore = api;
 })(typeof self !== 'undefined' ? self : this);
 
@@ -580,6 +651,7 @@ function buildObject(geoms, color, transparency, faceColors) {
     const mesh = new THREE.Mesh(geo, useMats); mesh.userData.pick = true; g.add(mesh);
     const cap = new THREE.Mesh(geo, capMat); cap.userData.cap = true; cap.visible = false; cap.renderOrder = -1; g.add(cap);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), lineMat); edges.userData.edge = true; g.add(edges);
+    if (gd.motion) for (const o of [mesh, cap, edges]) o.userData.motion = gd.motion;   // 開閉で動く部分
   }
   g.userData.mats = mats; g.userData.capMat = capMat; g.userData.lineMat = lineMat;
   return g;
@@ -664,6 +736,14 @@ function meshBrep(occt, bytes, item) {
   const useFaces = item.faceColors && item.faceColors.length === faceCount;
   let faceIdx = 0;
   const M = FCStdCore.chainMatrix(THREE, item.chain);
+  if (item.motions && item.motions.length) {
+    // 部品の座標 → 画面の座標 = 親の配置 × 部品自身の配置（形状ファイルには部品自身の配置が入っている）
+    const Mdir = FCStdCore.chainMatrix(THREE, item.chain.concat(item.ownPlacement ? [item.ownPlacement] : []));
+    const owner = f => { for (let i = 0; i < item.motions.length; i++) { const k = item.motions[i].factorOf(f, faceCount); if (k !== null && k !== undefined && k !== 0) return [i, k]; } return null; };
+    let any = false;
+    for (let f = 0; f < faceCount && !any; f++) any = !!owner(f);
+    if (any) return meshByMotion(res.meshes, M, Mdir, useFaces, item.motions, owner);
+  }
   for (const m of res.meshes) {
     if (!m.index || !m.index.array.length) continue;
     const geo = new THREE.BufferGeometry();
@@ -674,6 +754,54 @@ function meshBrep(occt, bytes, item) {
     let groups = null;
     if (useFaces) { groups = (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })); }
     geoms.push({ geometry: geo, groups });
+  }
+  return geoms;
+}
+
+// 開閉できる部品：面ごとに「どの動きに・何倍で」動くかで形を分ける（動かない面は 1 つにまとめる）。
+// 分けた形には motion { mi（動きの番号）, factor, type, axis, origin（画面の座標） } を付け、applyMotion で動かす
+function meshByMotion(meshes, M, Mdir, useFaces, motions, owner) {
+  const R = new THREE.Matrix4().extractRotation(Mdir);
+  const world = motions.map(m => ({
+    type: m.type,
+    axis: new THREE.Vector3(...m.axis).applyMatrix4(R).normalize().toArray(),
+    origin: new THREE.Vector3(...m.origin).applyMatrix4(Mdir).toArray()
+  }));
+  const buckets = new Map();   // 'mi:factor' または 'static' → { pos, nor, idx, groups, mi, factor }
+  let faceIdx = 0;
+  for (const m of meshes) {
+    const P = m.attributes.position.array, N = m.attributes.normal ? m.attributes.normal.array : null, I = m.index ? m.index.array : [];
+    for (const f of (m.brep_faces || [])) {
+      const o = owner(faceIdx);
+      const k = o ? o[0] + ':' + o[1] : 'static';
+      if (!buckets.has(k)) buckets.set(k, { pos: [], nor: [], idx: [], groups: [], map: new Map(), mi: o ? o[0] : -1, factor: o ? o[1] : 0 });
+      const b = buckets.get(k);
+      const start = b.idx.length;
+      for (let t = f.first; t <= f.last; t++) for (let j = 0; j < 3; j++) {
+        const v = I[t * 3 + j];
+        let nv = b.map.get(v);
+        if (nv === undefined) {
+          nv = b.pos.length / 3; b.map.set(v, nv);
+          b.pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
+          if (N) b.nor.push(N[v * 3], N[v * 3 + 1], N[v * 3 + 2]);
+        }
+        b.idx.push(nv);
+      }
+      b.groups.push({ start, count: b.idx.length - start, colorIndex: faceIdx });
+      faceIdx++;
+    }
+    for (const b of buckets.values()) b.map = new Map();   // 頂点の番号は形（mesh）ごと
+  }
+  const geoms = [];
+  for (const b of buckets.values()) {
+    if (!b.idx.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    if (b.nor.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+    geo.setIndex(b.idx);
+    geo.applyMatrix4(M);
+    const motion = b.mi < 0 ? null : Object.assign({ mi: b.mi, factor: b.factor }, world[b.mi]);
+    geoms.push({ geometry: geo, groups: useFaces ? b.groups : null, motion });
   }
   return geoms;
 }
@@ -696,11 +824,12 @@ async function openFile(file) {
 
     const newParts = info.items.filter(it => it.shapeFile && !it.missing).map((it, i) => ({
       id: 'f' + i, label: it.label, type: it.type, group: it.group, color: it.color, transparency: it.transparency,
-      visible: it.visible, defVisible: it.visible,
+      visible: it.visible, defVisible: it.visible, motions: it.motions,
       load: async () => buildObject(meshBrep(occt, files.get(it.shapeFile), it), it.color, it.transparency, it.faceColors)
     }));
     clearModel();
     parts = newParts;
+    initMove();
     docInfo = { name: (info.label || file.name.replace(/\.fcstd$/i, '')), file: file.name, version: (info.version.match(/^[\d.]+/) || ['—'])[0], sample: false };
     const vis = parts.filter(p => p.visible);
     let done = 0, failed = 0;
@@ -730,6 +859,7 @@ async function ensureLoaded(p, fit) {
     p.obj = await p.load();
     p.obj.userData.part = p;
     applyLook(p.obj);
+    applyMotion(p);          // あとから表示した部品も、今の引出し量に合わせる
     model.add(p.obj);
   } finally { p.loading = false; }
   p.obj.visible = p.visible;
@@ -794,7 +924,15 @@ function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;
 // ---------- title block ----------
 function visibleBox() {
   const box = new THREE.Box3();
-  for (const p of parts) if (p.obj && p.visible) box.expandByObject(p.obj);
+  for (const p of parts) if (p.obj && p.visible) {
+    // 形は画面の座標で作ってあるので、ふつうは形の外接箱そのままで正確。
+    // 開閉で回転させた部分（扉など）だけは、外接箱を回すと大きく出るので、頂点から正確に測る
+    p.obj.traverse(o => {
+      if (!o.userData.pick) return;
+      const rot = o.userData.motion && o.userData.motion.type === 'rotate' && moveT !== null;
+      box.expandByObject(o, rot);
+    });
+  }
   return box;
 }
 const fmt = v => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2));
@@ -884,6 +1022,75 @@ function setMeasure(on) {
 }
 $('meas-clear').addEventListener('click', clearMeasure);
 
+// ---------- 開閉（部品の動き方 Motion。書式は MOTION_SPEC.md） ----------
+// スライダーは「開き具合」0〜1（画面では 0〜100 %）。動きごとに min + 開き具合 × (max − min) にする
+let moveT = null;      // 今の開き具合。null = 保存したときの状態のまま
+let moveAnim = null;
+const moveParts = () => parts.filter(p => p.motions && p.motions.length);
+const allMotions = () => moveParts().flatMap(p => p.motions);
+const _mv = { a: new THREE.Vector3(), o: new THREE.Vector3(), m: new THREE.Matrix4(), r: new THREE.Matrix4(), t: new THREE.Matrix4() };
+function applyMotion(p) {
+  if (!p.obj || !p.motions || moveT === null) return;
+  p.obj.traverse(o => {
+    const mo = o.userData.motion;
+    if (!mo) return;
+    const m = p.motions[mo.mi];
+    const d = (m.min + moveT * (m.max - m.min) - m.value) * mo.factor;     // 保存時からの変化
+    o.matrixAutoUpdate = false;
+    _mv.a.fromArray(mo.axis);
+    if (mo.type === 'slide') o.matrix.makeTranslation(_mv.a.x * d, _mv.a.y * d, _mv.a.z * d);
+    else {
+      _mv.o.fromArray(mo.origin);
+      _mv.r.makeRotationAxis(_mv.a, THREE.MathUtils.degToRad(d));
+      o.matrix.makeTranslation(_mv.o.x, _mv.o.y, _mv.o.z).multiply(_mv.r).multiply(_mv.t.makeTranslation(-_mv.o.x, -_mv.o.y, -_mv.o.z));
+    }
+    o.matrixWorldNeedsUpdate = true;
+  });
+}
+function moveLabel(t) {
+  // 動きがすべて同じ種類・同じ範囲なら、mm や度も出す
+  const ms = allMotions();
+  let s = Math.round(t * 100) + ' %';
+  if (ms.length && ms.every(m => m.type === ms[0].type && m.min === ms[0].min && m.max === ms[0].max)) {
+    const v = ms[0].min + t * (ms[0].max - ms[0].min);
+    s += ms[0].type === 'slide' ? `（${Math.round(v)} mm）` : `（${Math.round(v)}°）`;
+  }
+  return s;
+}
+function setMove(t, done) {
+  moveT = Math.max(0, Math.min(1, t));
+  $('move-range').value = Math.round(moveT * 1000); $('move-val').textContent = moveLabel(moveT);
+  for (const p of moveParts()) applyMotion(p);
+  if (done) { updateTitle(); if (clipOn) updateSection(); }
+}
+function animateMove(t) {
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const t0 = moveT === null ? Number($('move-range').value) / 1000 : moveT;
+  if (reduce || Math.abs(t - t0) < 0.001) { setMove(t, true); return; }
+  moveAnim = { t0: performance.now(), x0: t0, x1: t, ms: 300 + Math.abs(t - t0) * 600 };
+}
+function setMovePanel(on) {
+  $('t-move').setAttribute('aria-pressed', on); $('move-panel').hidden = !on;
+}
+function initMove() {
+  // ファイルを開いたとき：開閉できる部品があればボタンを出し、スライダーを保存時の状態に合わせる
+  moveT = null; moveAnim = null;
+  const ms = allMotions();
+  $('t-move').hidden = $('t-move-sep').hidden = !ms.length;
+  if (!ms.length) { setMovePanel(false); return; }
+  const frac = m => (m.value - m.min) / (m.max - m.min);
+  const t0 = frac(ms[0]);
+  $('move-range').value = Math.round(t0 * 1000); $('move-val').textContent = moveLabel(t0);
+  const mixed = ms.some(m => Math.abs(frac(m) - t0) > 1e-6);
+  $('t-move').title = ms.length + ' か所を開閉できます（' + [...new Set(ms.map(m => m.name))].join('・') + '）' +
+    (mixed ? '。保存時の開き具合がそろっていません。スライダーを動かすと同じ開き具合にそろいます' : '');
+}
+$('t-move').addEventListener('click', () => setMovePanel($('move-panel').hidden));
+$('move-range').addEventListener('input', e => { moveAnim = null; setMove(Number(e.target.value) / 1000, false); });
+$('move-range').addEventListener('change', e => setMove(Number(e.target.value) / 1000, true));
+$('move-open').addEventListener('click', () => animateMove(1));
+$('move-close').addEventListener('click', () => animateMove(0));
+
 // ---------- picking (tap without drag) ----------
 const ray = new THREE.Raycaster();
 let down = null;
@@ -952,6 +1159,11 @@ function tick(now) {
     const k = Math.min((now - anim.t0) / 420, 1), e = 1 - Math.pow(1 - k, 3);
     camera.position.lerpVectors(anim.p0, anim.p1, e); controls.target.lerpVectors(anim.q0, anim.q1, e);
     if (k >= 1) anim = null;
+  }
+  if (moveAnim) {
+    const k = Math.min((now - moveAnim.t0) / moveAnim.ms, 1), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    setMove(moveAnim.x0 + (moveAnim.x1 - moveAnim.x0) * e, k >= 1);
+    if (k >= 1) moveAnim = null;
   }
   controls.update();
   if (stage.clientWidth !== renderer.domElement.width / renderer.getPixelRatio()) resize();
