@@ -57,7 +57,7 @@ body {
   padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: grid; grid-template-rows: auto 1fr auto; gap: 12px;
+  display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); gap: 12px;   /* 列を画面幅までに（中身で広がらない） */
 }
 .chrome > * { pointer-events: none; }
 .chrome .hit, .chrome button, .chrome input, .chrome label { pointer-events: auto; }
@@ -138,6 +138,28 @@ body {
 .subpanel input[type=range] { width: min(320px, 50vw); accent-color: var(--cut); height: 38px; }
 .subpanel .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
 #move-val { min-width: 140px; }
+.move-panel { display: flex; flex-direction: column; gap: 6px; width: min(640px, 100%); box-sizing: border-box; }
+.move-all { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.move-all .lbl { font-size: 12px; color: var(--ink-2); }
+.move-all input[type=range], .move-list input[type=range] { accent-color: var(--cut); height: 34px; }
+.move-all input[type=range] { width: min(260px, 40vw); }
+.move-list { list-style: none; margin: 0; padding: 4px 0 0; border-top: 1px solid var(--line); max-height: 30vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.move-list li { display: flex; align-items: center; gap: 8px; min-height: 42px; }
+.move-list .nm { flex: 1; min-width: 6em; overflow-wrap: anywhere; line-height: 1.3; cursor: pointer; }
+.move-list li.open .nm { font-weight: 600; }
+.move-list input[type=range] { width: min(180px, 28vw); }
+.move-list .v { font-family: var(--font-num); font-size: 12px; min-width: 112px; text-align: right; font-variant-numeric: tabular-nums; }
+.move-list .mini { min-width: 64px; }
+.move-hint { font-size: 11px; color: var(--ink-2); text-align: center; }
+@media (max-width: 560px) {
+  /* 狭い画面：部品名を 1 行目、スライダー・値・ボタンを 2 行目に */
+  .move-list li { flex-wrap: wrap; gap: 2px 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .move-list .nm { flex-basis: 100%; }
+  .move-list input[type=range] { flex: 1; width: auto; min-width: 0; }
+  .move-list .v { min-width: 0; font-size: 11px; }
+  .move-all input[type=range] { flex: 1; min-width: 80px; }
+  #move-val { min-width: 0; }
+}
 .subpanel .mini { font: inherit; min-height: 38px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: none; color: var(--ink); cursor: pointer; }
 .measure-out { font-family: var(--font-num); font-variant-numeric: tabular-nums; display: grid; grid-template-columns: auto auto auto; gap: 2px 14px; font-size: 12px; }
 .measure-out .big { grid-column: 1 / -1; font-size: 18px; font-weight: 500; }
@@ -208,11 +230,16 @@ body {
       <div class="measure-out" id="meas-out"><span class="big">面上の2点をタップしてください</span></div>
       <button class="mini" id="meas-clear">消去</button>
     </div>
-    <div class="subpanel chip hit" id="move-panel" hidden>
-      <button class="mini" id="move-close">閉じる</button>
-      <input type="range" id="move-range" min="0" max="1000" step="1" value="0" aria-label="開き具合">
-      <span class="num" id="move-val">0 %</span>
-      <button class="mini" id="move-open">開く</button>
+    <div class="chip hit move-panel" id="move-panel" hidden>
+      <div class="move-all">
+        <span class="lbl">すべて</span>
+        <button class="mini" id="move-close">閉じる</button>
+        <input type="range" id="move-range" min="0" max="1000" step="1" value="0" aria-label="すべての開き具合">
+        <span class="num" id="move-val">0 %</span>
+        <button class="mini" id="move-open">開く</button>
+      </div>
+      <ul class="move-list" id="move-list"></ul>
+      <div class="move-hint">3D の部品をタップすると、そこだけ開閉します</div>
     </div>
     <nav class="rail hit" aria-label="表示操作">
       <button class="tool" id="t-fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><rect x="9" y="9" width="6" height="6"/></svg>全体</button>
@@ -929,7 +956,7 @@ function visibleBox() {
     // 開閉で回転させた部分（扉など）だけは、外接箱を回すと大きく出るので、頂点から正確に測る
     p.obj.traverse(o => {
       if (!o.userData.pick) return;
-      const rot = o.userData.motion && o.userData.motion.type === 'rotate' && moveT !== null;
+      const rot = !!(o.userData.motion && o.userData.motion.type === 'rotate');
       box.expandByObject(o, rot);
     });
   }
@@ -1023,19 +1050,21 @@ function setMeasure(on) {
 $('meas-clear').addEventListener('click', clearMeasure);
 
 // ---------- 開閉（部品の動き方 Motion。書式は MOTION_SPEC.md） ----------
-// スライダーは「開き具合」0〜1（画面では 0〜100 %）。動きごとに min + 開き具合 × (max − min) にする
-let moveT = null;      // 今の開き具合。null = 保存したときの状態のまま
-let moveAnim = null;
+// 開き具合 t は 0〜1（画面では 0〜100 %）。動きごとに min + t × (max − min) にする。
+// 開き具合は「部品 × 動き」ごとに持つ（p.moveT[動きの番号]）ので、扉・引出しを 1 つずつ開閉できる。
+// 一覧の上の「すべて」で、全部を同じ開き具合にもできる。
+let moveEntries = [];  // [{ p, mi, row }] 開閉できる「部品 × 動き」の一覧
+let moveAnim = null;   // { start, ms, items: [{ e, x0, x1 }] }
 const moveParts = () => parts.filter(p => p.motions && p.motions.length);
-const allMotions = () => moveParts().flatMap(p => p.motions);
+const frac = m => (m.value - m.min) / (m.max - m.min);
 const _mv = { a: new THREE.Vector3(), o: new THREE.Vector3(), m: new THREE.Matrix4(), r: new THREE.Matrix4(), t: new THREE.Matrix4() };
 function applyMotion(p) {
-  if (!p.obj || !p.motions || moveT === null) return;
+  if (!p.obj || !p.motions || !p.moveT) return;
   p.obj.traverse(o => {
     const mo = o.userData.motion;
     if (!mo) return;
     const m = p.motions[mo.mi];
-    const d = (m.min + moveT * (m.max - m.min) - m.value) * mo.factor;     // 保存時からの変化
+    const d = (m.min + p.moveT[mo.mi] * (m.max - m.min) - m.value) * mo.factor;     // 保存時からの変化
     o.matrixAutoUpdate = false;
     _mv.a.fromArray(mo.axis);
     if (mo.type === 'slide') o.matrix.makeTranslation(_mv.a.x * d, _mv.a.y * d, _mv.a.z * d);
@@ -1047,49 +1076,104 @@ function applyMotion(p) {
     o.matrixWorldNeedsUpdate = true;
   });
 }
-function moveLabel(t) {
-  // 動きがすべて同じ種類・同じ範囲なら、mm や度も出す
-  const ms = allMotions();
-  let s = Math.round(t * 100) + ' %';
-  if (ms.length && ms.every(m => m.type === ms[0].type && m.min === ms[0].min && m.max === ms[0].max)) {
-    const v = ms[0].min + t * (ms[0].max - ms[0].min);
-    s += ms[0].type === 'slide' ? `（${Math.round(v)} mm）` : `（${Math.round(v)}°）`;
-  }
-  return s;
+function valueLabel(m, t) {
+  const v = m.min + t * (m.max - m.min);
+  return Math.round(t * 100) + ' %' + (m.type === 'slide' ? `（${Math.round(v)} mm）` : `（${Math.round(v)}°）`);
 }
-function setMove(t, done) {
-  moveT = Math.max(0, Math.min(1, t));
-  $('move-range').value = Math.round(moveT * 1000); $('move-val').textContent = moveLabel(moveT);
-  for (const p of moveParts()) applyMotion(p);
-  if (done) { updateTitle(); if (clipOn) updateSection(); }
+function entryT(e) { return e.p.moveT[e.mi]; }
+function refreshAllRow() {
+  // 「すべて」の行：開き具合がそろっていればその値、ばらばらなら平均の位置に置いて「ばらばら」と出す
+  if (!moveEntries.length) return;
+  const ts = moveEntries.map(entryT);
+  const same = ts.every(t => Math.abs(t - ts[0]) < 1e-4);
+  const avg = ts.reduce((a, b) => a + b, 0) / ts.length;
+  $('move-range').value = Math.round(avg * 1000);
+  const ms = moveEntries.map(e => e.p.motions[e.mi]);
+  const uniform = ms.every(m => m.type === ms[0].type && m.min === ms[0].min && m.max === ms[0].max);
+  $('move-val').textContent = !same ? 'ばらばら' : (uniform ? valueLabel(ms[0], ts[0]) : Math.round(ts[0] * 100) + ' %');
 }
-function animateMove(t) {
+function refreshRow(e) {
+  if (!e.row) return;
+  const t = entryT(e), m = e.p.motions[e.mi];
+  e.row.range.value = Math.round(t * 1000);
+  e.row.val.textContent = valueLabel(m, t);
+  e.row.btn.textContent = t > 0.5 ? '閉じる' : '開く';
+  e.row.li.classList.toggle('open', t > 0.001);
+}
+function setEntry(e, t) {
+  e.p.moveT[e.mi] = Math.max(0, Math.min(1, t));
+  applyMotion(e.p);
+  refreshRow(e);
+}
+function afterMove() { refreshAllRow(); updateTitle(); if (clipOn) updateSection(); }
+function animateEntries(list, t) {
+  // list の動きを、開き具合 t までなめらかに動かす（動いている途中の物は、今の位置から）
+  moveAnim = null;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const t0 = moveT === null ? Number($('move-range').value) / 1000 : moveT;
-  if (reduce || Math.abs(t - t0) < 0.001) { setMove(t, true); return; }
-  moveAnim = { t0: performance.now(), x0: t0, x1: t, ms: 300 + Math.abs(t - t0) * 600 };
+  const items = list.map(e => ({ e, x0: entryT(e), x1: t })).filter(it => Math.abs(it.x1 - it.x0) > 0.001);
+  if (!items.length) return;
+  if (reduce) { items.forEach(it => setEntry(it.e, it.x1)); afterMove(); return; }
+  const far = Math.max(...items.map(it => Math.abs(it.x1 - it.x0)));
+  moveAnim = { start: performance.now(), ms: 300 + far * 600, items };
+}
+function toggleEntry(e) { animateEntries([e], entryT(e) > 0.5 ? 0 : 1); }
+function stepMoveAnim(now) {
+  if (!moveAnim) return;
+  const k = Math.min((now - moveAnim.start) / moveAnim.ms, 1), s = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  for (const it of moveAnim.items) setEntry(it.e, it.x0 + (it.x1 - it.x0) * s);
+  if (k >= 1) { moveAnim = null; afterMove(); } else refreshAllRow();
 }
 function setMovePanel(on) {
   $('t-move').setAttribute('aria-pressed', on); $('move-panel').hidden = !on;
 }
+function buildMoveList() {
+  const ul = $('move-list'); ul.innerHTML = '';
+  for (const e of moveEntries) {
+    const m = e.p.motions[e.mi];
+    const li = document.createElement('li');
+    const nm = document.createElement('span'); nm.className = 'nm';
+    nm.textContent = e.p.label + (e.p.motions.length > 1 || m.name !== e.p.label ? '・' + m.name : '');
+    nm.addEventListener('click', () => { if (e.p.obj && e.p.visible) focusOn(e.p.obj); });
+    const range = document.createElement('input'); range.type = 'range'; range.min = 0; range.max = 1000; range.step = 1;
+    range.setAttribute('aria-label', nm.textContent + 'の開き具合');
+    range.addEventListener('input', () => { moveAnim = null; setEntry(e, range.value / 1000); refreshAllRow(); });
+    range.addEventListener('change', () => { setEntry(e, range.value / 1000); afterMove(); });
+    const val = document.createElement('span'); val.className = 'v';
+    const btn = document.createElement('button'); btn.className = 'mini'; btn.addEventListener('click', () => toggleEntry(e));
+    li.append(nm, range, val, btn); ul.appendChild(li);
+    e.row = { li, range, val, btn };
+    refreshRow(e);
+  }
+  $('move-list').hidden = moveEntries.length < 2;      // 1 か所だけなら「すべて」の行で足りる
+}
 function initMove() {
-  // ファイルを開いたとき：開閉できる部品があればボタンを出し、スライダーを保存時の状態に合わせる
-  moveT = null; moveAnim = null;
-  const ms = allMotions();
-  $('t-move').hidden = $('t-move-sep').hidden = !ms.length;
-  if (!ms.length) { setMovePanel(false); return; }
-  const frac = m => (m.value - m.min) / (m.max - m.min);
-  const t0 = frac(ms[0]);
-  $('move-range').value = Math.round(t0 * 1000); $('move-val').textContent = moveLabel(t0);
-  const mixed = ms.some(m => Math.abs(frac(m) - t0) > 1e-6);
-  $('t-move').title = ms.length + ' か所を開閉できます（' + [...new Set(ms.map(m => m.name))].join('・') + '）' +
-    (mixed ? '。保存時の開き具合がそろっていません。スライダーを動かすと同じ開き具合にそろいます' : '');
+  // ファイルを開いたとき：開閉できる部品があればボタンを出し、一覧を作り、それぞれ保存時の状態から始める
+  moveAnim = null;
+  moveEntries = [];
+  for (const p of moveParts()) {
+    p.moveT = p.motions.map(frac);
+    p.motions.forEach((m, mi) => moveEntries.push({ p, mi, row: null }));
+  }
+  $('t-move').hidden = $('t-move-sep').hidden = !moveEntries.length;
+  if (!moveEntries.length) { setMovePanel(false); $('move-list').innerHTML = ''; return; }
+  buildMoveList();
+  refreshAllRow();
+  $('t-move').title = moveEntries.length + ' か所を開閉できます（' + [...new Set(moveEntries.map(e => e.p.motions[e.mi].name))].join('・') + '）';
 }
 $('t-move').addEventListener('click', () => setMovePanel($('move-panel').hidden));
-$('move-range').addEventListener('input', e => { moveAnim = null; setMove(Number(e.target.value) / 1000, false); });
-$('move-range').addEventListener('change', e => setMove(Number(e.target.value) / 1000, true));
-$('move-open').addEventListener('click', () => animateMove(1));
-$('move-close').addEventListener('click', () => animateMove(0));
+$('move-range').addEventListener('input', e => { moveAnim = null; for (const x of moveEntries) setEntry(x, e.target.value / 1000); refreshAllRow(); });
+$('move-range').addEventListener('change', e => { for (const x of moveEntries) setEntry(x, e.target.value / 1000); afterMove(); });
+$('move-open').addEventListener('click', () => animateEntries(moveEntries.filter(e => e.p.visible), 1));
+$('move-close').addEventListener('click', () => animateEntries(moveEntries, 0));
+
+// 開閉パネルを開いているときは、3D の部品をタップすると、そこだけ開閉する
+function entryForHit(hitObj) {
+  const p = hitObj.parent.userData.part;
+  if (!p || !p.motions) return null;
+  const mo = hitObj.userData.motion;
+  const mi = mo ? mo.mi : (p.motions.length === 1 ? 0 : -1);   // 動かない面をタップしたとき：動きが 1 つならそれ
+  return moveEntries.find(e => e.p === p && e.mi === mi) || null;
+}
 
 // ---------- picking (tap without drag) ----------
 const ray = new THREE.Raycaster();
@@ -1107,6 +1191,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   model.traverse(o => { if (o.userData.pick && o.parent.visible) targets.push(o); });
   const hit = ray.intersectObjects(targets, false).find(h => !clipOn || clip.distanceToPoint(h.point) >= -1e-6);
   if (measuring) { if (hit) addMeasurePoint(hit.point); return; }
+  if (hit && !$('move-panel').hidden) { const me = entryForHit(hit.object); if (me) { toggleEntry(me); return; } }
   const p = hit ? hit.object.parent.userData.part : null;
   if (p) select(p); else if (selected) select(selected);
 });
@@ -1160,11 +1245,7 @@ function tick(now) {
     camera.position.lerpVectors(anim.p0, anim.p1, e); controls.target.lerpVectors(anim.q0, anim.q1, e);
     if (k >= 1) anim = null;
   }
-  if (moveAnim) {
-    const k = Math.min((now - moveAnim.t0) / moveAnim.ms, 1), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-    setMove(moveAnim.x0 + (moveAnim.x1 - moveAnim.x0) * e, k >= 1);
-    if (k >= 1) moveAnim = null;
-  }
+  stepMoveAnim(now);
   controls.update();
   if (stage.clientWidth !== renderer.domElement.width / renderer.getPixelRatio()) resize();
   renderer.render(scene, camera);
