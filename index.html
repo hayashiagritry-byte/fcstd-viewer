@@ -88,6 +88,8 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
 .badge { display: inline-block; margin-left: 5px; padding: 0 5px; font-size: 10px; font-weight: 500; border: 1px solid var(--cut); color: var(--cut); vertical-align: 1px; }
 #info dl { margin: 0; padding: 2px 12px 10px 28px; display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; font-size: 12px; }
 #info dt { color: var(--ink-2); }
+#info dt.texk { display: none; }
+#info dd#tex-row:not([hidden]) { grid-column: 1 / -1; font-family: var(--font-ui); display: grid; gap: 6px; justify-items: start; }
 #info dd { margin: 0; font-family: var(--font-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* parts */
@@ -222,7 +224,9 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     <dt>表示中の部品</dt><dd id="tb-count">—</dd>
     <dt>作成バージョン</dt><dd id="tb-ver">—</dd>
     <dt>単位</dt><dd>mm</dd>
+    <dt id="tex-row-k" class="texk">木目などの画像</dt><dd id="tex-row" hidden><span id="tex-state"></span><br><button class="mini" id="tex-load">画像を読み込む</button></dd>
   </dl>
+  <input type="file" id="tex-file" accept="image/*" multiple hidden>
 </section>
 
 <section class="float" id="partsPanel" aria-label="部品">
@@ -511,6 +515,25 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
         ob.linkPlacement = propValue(P.LinkPlacement) || ob.placement;
       }
       if (ob.type === 'PartDesign::Body') ob.tip = propValue(P.Tip) || null;
+      // 家具CAD(vwbridge_feature)の木目など：FaceColors の "tex"、天板の上張り：TexInfo
+      // 画像はパソコン上のファイルを指しているので、ここではファイル名・貼る大きさ・木目の向き・面の範囲だけを持つ
+      const base = path => String(path || '').split(/[\\/]/).pop();
+      if (P.FaceColors) {
+        try {
+          const fcj = JSON.parse(propValue(P.FaceColors) || '{}');
+          if (Array.isArray(fcj.tex)) ob.vwTex = fcj.tex.filter(t => t && t.image && Array.isArray(t.faces)).map(t => ({
+            image: base(t.image), tile: Array.isArray(t.tile) ? t.tile.map(Number) : [Number(t.tile) || 1000, Number(t.tile) || 1000],
+            grain: t.grain || null, faces: t.faces.map(Number) }));
+        } catch (e) {}
+      }
+      if (P.TexInfo) {
+        try {
+          const ti = JSON.parse(propValue(P.TexInfo) || '{}');
+          if (ti.image) ob.vwTex = [{ image: base(ti.image), tile: Array.isArray(ti.tile) ? ti.tile.map(Number) : [Number(ti.tile) || 150, Number(ti.tile) || 150],
+            grain: ti.grain || null, faces: [0, 1e9], edge: Array.isArray(ti.edge) ? ti.edge.map(Number) : null, topOnly: true }];
+        } catch (e) {}
+      }
+      if (P.VWParent || P.TexInfo) ob.overlay = true;   // 親の面の上に重ねて貼る板：必ず手前に描く
       // 動き方：プロパティ Motion を読む。無ければ、家具CAD 試作版の部品として互換の動きを作る
       if (P.Motion) {
         try { const ms = parseMotion(propValue(P.Motion) || ''); if (ms.length) ob.motions = ms; }
@@ -627,7 +650,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
       let group = '';
       let p = viewOb.parent ? objects.get(viewOb.parent) : null;
       while (p && !group) { if (/^(App::Part|App::DocumentObjectGroup|Arch|BuildingPart)/.test(p.type) || p.group) group = p.label; p = p.parent ? objects.get(p.parent) : null; }
-      return {
+      const r = {
         key, name: viewOb.name, label: viewOb.label || viewOb.name, type: shapeOb.type,
         shapeFile: shapeOb.shapeFile, chain, visible,
         color: (ov ? viewOb.color : shapeOb.color) || [0.8, 0.8, 0.8], transparency: (ov ? viewOb.transparency : shapeOb.transparency) || 0,
@@ -635,8 +658,12 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
         texturePathOnly: (ov ? viewOb : shapeOb).texturePathOnly || null,
         texture: (viewOb !== shapeOb && viewOb.overrideMaterial ? viewOb.texture : shapeOb.texture) || null,
         ownPlacement: shapeOb.placement || null,   // 形状ファイルにすでに入っている、部品自身の配置（開く向き・テクスチャの計算に使う）
-        motions: shapeOb.motions || null
+        motions: shapeOb.motions || null,
+        vwTex: shapeOb.vwTex || null, overlay: !!shapeOb.overlay
       };
+      // 上張りの板は FreeCAD 上では透明 100% で保存され、アドオンが画像を別に描いている → 不透明で描く
+      if (r.overlay) r.transparency = 0;
+      return r;
     }
 
     for (const ob of objects.values()) if (!ob.parent) walk(ob, [], false, '', 0);
@@ -651,8 +678,9 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     const bin = uniq.filter(it => it.shapeFile && /\.bin$/i.test(it.shapeFile));
     if (bin.length) notes.push('バイナリ形式で保存された形状が ' + bin.length + ' 件あり、表示できない可能性があります');
 
+    const texNames = [...new Set(uniq.flatMap(it => (it.vwTex || []).map(t => t.image)))];
     if (motionErrors.length) notes.push('動き方（Motion）を読めなかった部品があります：' + motionErrors.join('、'));
-    return { label, version, objects, items: uniq, notes };
+    return { label, version, objects, items: uniq, notes, texNames };
   }
 
   // Compose a placement chain into a 4x4 column-major matrix using THREE
@@ -743,42 +771,166 @@ function loadTexture(url) {
   return texCache.get(url);
 }
 
-function buildObject(geoms, color, transparency, faceColors, texture) {
+// faceTex: 面の番号ごとの { name（画像のファイル名）, color（色を変える時） } または null
+function buildObject(geoms, color, transparency, faceColors, texture, opts) {
+  opts = opts || {};
+  const faceTex = opts.faceTex || null;
   const g = new THREE.Group();
-  const base = new THREE.Color().setRGB(color[0], color[1], color[2]).convertSRGBToLinear();
+  const lin = c => new THREE.Color().setRGB(c[0], c[1], c[2]).convertSRGBToLinear();
   const mkMat = c => new THREE.MeshPhongMaterial({
-    color: c, shininess: 18, specular: 0x222222, side: THREE.FrontSide,
-    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+    color: c, shininess: 18, specular: 0x222222, side: opts.overlay ? THREE.DoubleSide : THREE.FrontSide,
+    polygonOffset: true, polygonOffsetFactor: opts.overlay ? -1 : 1, polygonOffsetUnits: opts.overlay ? -4 : 1,
     transparent: transparency > 0.01, opacity: 1 - transparency, depthWrite: transparency <= 0.01, clippingPlanes: []
   });
-  const mats = [mkMat(base)];
-  if (texture && !faceColors) mats[0].map = texture;
+  const mats = [mkMat(lin(color))];
+  if (texture && !faceColors && !faceTex) mats[0].map = texture;
   const palette = new Map();
-  if (faceColors) faceColors.forEach(fc => {
-    const k = fc.map(v => v.toFixed(3)).join();
-    if (!palette.has(k)) { palette.set(k, mats.length); mats.push(mkMat(new THREE.Color().setRGB(fc[0], fc[1], fc[2]).convertSRGBToLinear())); }
-  });
+  const matFor = i => {
+    const ft = faceTex ? faceTex[i] : null;
+    const fc = ft && ft.color ? ft.color : (faceColors && faceColors[i]) || color;
+    const name = ft && ft.name ? ft.name : '';
+    const k = fc.map(v => v.toFixed(3)).join() + '|' + name;
+    if (!palette.has(k)) {
+      const m = mkMat(name ? new THREE.Color(0xffffff) : lin(fc));
+      if (name) { m.userData.texName = name; m.userData.baseColor = lin(fc); applyVWTex(m); }
+      palette.set(k, mats.length); mats.push(m);
+    }
+    return palette.get(k);
+  };
   const capMat = new THREE.MeshBasicMaterial({ color: cutColor(), side: THREE.BackSide, clippingPlanes: [] });
   const lineMat = new THREE.LineBasicMaterial({ color: edgeColor(), clippingPlanes: [] });
   for (const gd of geoms) {
     const geo = gd.geometry;
     if (!geo.attributes.normal) geo.computeVertexNormals();
     let useMats = mats[0];
-    if (gd.groups && faceColors) {
+    if (gd.groups && (faceColors || faceTex)) {
       geo.clearGroups();
-      for (const gr of gd.groups) {
-        const fc = faceColors[gr.colorIndex];
-        geo.addGroup(gr.start, gr.count, fc ? palette.get(fc.map(v => v.toFixed(3)).join()) : 0);
-      }
+      for (const gr of gd.groups) geo.addGroup(gr.start, gr.count, matFor(gr.colorIndex));
       useMats = mats;
     }
     const mesh = new THREE.Mesh(geo, useMats); mesh.userData.pick = true; g.add(mesh);
+    if (opts.overlay) mesh.renderOrder = 1;
     const cap = new THREE.Mesh(geo, capMat); cap.userData.cap = true; cap.visible = false; cap.renderOrder = -1; g.add(cap);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), lineMat); edges.userData.edge = true; g.add(edges);
     if (gd.motion) for (const o of [mesh, cap, edges]) o.userData.motion = gd.motion;   // 開閉で動く部分
   }
   g.userData.mats = mats; g.userData.capMat = capMat; g.userData.lineMat = lineMat;
   return g;
+}
+
+// ================= 家具CAD の木目・天板の画像 =================
+// 画像は FCStd に入っていない（パソコン上のファイルを指している）ので、ファイル名で探す：
+// ① この端末で「画像を読み込む」で入れた画像 ② ビューワーと同じ場所の textures フォルダ
+const vwImages = new Map();      // ファイル名(小文字) → Promise<THREE.Texture|null>
+const vwUser = new Map();        // ファイル名(小文字) → Blob（この端末で読み込んだもの）
+const vwMats = new Set();        // 画像待ちの材質
+function texFromBlob(blob) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(blob);
+    new THREE.TextureLoader().load(url, t => {
+      t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); res(t);
+    }, undefined, () => res(null));
+  });
+}
+function getVWTex(name) {
+  const k = name.toLowerCase();
+  if (!vwImages.has(k)) {
+    vwImages.set(k, (async () => {
+      if (vwUser.has(k)) return texFromBlob(vwUser.get(k));
+      try {
+        const r = await fetch('textures/' + encodeURIComponent(name));
+        if (r.ok && /^image\//.test(r.headers.get('content-type') || 'image/')) return texFromBlob(await r.blob());
+      } catch (e) {}
+      return null;
+    })());
+  }
+  return vwImages.get(k);
+}
+function applyVWTex(m) {
+  vwMats.add(m);
+  getVWTex(m.userData.texName).then(t => {
+    if (t) { m.map = t; m.color.setHex(0xffffff); }
+    else { m.map = null; m.color.copy(m.userData.baseColor); }   // 画像が無いときは元の色
+    m.needsUpdate = true;
+  });
+}
+// 端末に保存（IndexedDB）。使えない環境では、開いている間だけ有効
+function idb() {
+  return new Promise((res, rej) => {
+    try { const q = indexedDB.open('fcv-textures', 1); q.onupgradeneeded = () => q.result.createObjectStore('img'); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }
+    catch (e) { rej(e); }
+  });
+}
+async function loadStoredImages() {
+  try {
+    const db = await idb();
+    await new Promise(res => {
+      const tx = db.transaction('img', 'readonly'), st = tx.objectStore('img'), rq = st.openCursor();
+      rq.onsuccess = () => { const c = rq.result; if (c) { vwUser.set(c.key, c.value); c.continue(); } else res(); };
+      rq.onerror = () => res();
+    });
+  } catch (e) {}
+}
+async function addUserImages(files) {
+  const names = [];
+  let db = null; try { db = await idb(); } catch (e) {}
+  for (const f of files) {
+    const k = f.name.toLowerCase(); vwUser.set(k, f); vwImages.delete(k); names.push(f.name);
+    if (db) try { db.transaction('img', 'readwrite').objectStore('img').put(f, k); } catch (e) {}
+  }
+  vwMats.forEach(applyVWTex);
+  updateTexStatus();
+  toast(names.length + ' 枚の画像を読み込みました', false, 3000);
+}
+let currentTexNames = [];
+async function updateTexStatus() {
+  const row = $('tex-row');
+  if (!currentTexNames.length) { row.hidden = true; return; }
+  const found = await Promise.all(currentTexNames.map(n => getVWTex(n).then(t => !!t)));
+  const missing = currentTexNames.filter((n, i) => !found[i]);
+  row.hidden = false;
+  $('tex-state').textContent = missing.length ? `${missing.length}/${currentTexNames.length} 枚が見つかりません（${missing.join('、')}）` : `${currentTexNames.length} 枚すべて表示中`;
+  return missing;
+}
+
+// 家具CAD の画像の貼り方：面ごとに、いちばん向いている軸に投影し、tile（mm）の大きさで繰り返す。
+// grain（木目の向き X/Y/Z）が面の中にあるときは、画像の縦をその向きに合わせる
+function addVWUVs(geoms, ownPlacement, faceTexOf) {
+  const inv = ownPlacement ? FCStdCore.placementMatrix(THREE, ownPlacement).invert() : new THREE.Matrix4();
+  const v = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), n = new THREE.Vector3();
+  const AX = { X: 0, Y: 1, Z: 2 };
+  const faceTex = [];
+  for (const gd of geoms) {
+    if (!gd.groups) continue;
+    const geo = gd.geometry, pos = geo.attributes.position, idx = geo.index.array;
+    const uv = geo.attributes.uv ? geo.attributes.uv.array : new Float32Array(pos.count * 2);
+    const local = i => v.fromBufferAttribute(pos, i).applyMatrix4(inv);
+    for (const gr of gd.groups) {
+      const t = faceTexOf(gr.colorIndex);
+      if (!t) continue;
+      n.set(0, 0, 0);
+      for (let k = gr.start; k < gr.start + gr.count; k += 3) {
+        a.copy(local(idx[k])); b.copy(local(idx[k + 1])); c.copy(local(idx[k + 2]));
+        n.add(b.sub(a).cross(c.sub(a)));
+      }
+      const an = [Math.abs(n.x), Math.abs(n.y), Math.abs(n.z)];
+      const dom = an.indexOf(Math.max(...an));
+      if (t.topOnly && dom !== 2) { faceTex[gr.colorIndex] = t.edge ? { color: t.edge } : null; continue; }
+      const plane = [0, 1, 2].filter(x => x !== dom);
+      const ga = t.grain != null ? AX[String(t.grain).toUpperCase()] : undefined;
+      let ua = plane[0], va = plane[1];
+      if (ga !== undefined && plane.includes(ga)) { va = ga; ua = plane.find(x => x !== ga); }
+      const tw = t.tile[0] || 1000, th = t.tile[1] || tw;
+      for (let k = gr.start; k < gr.start + gr.count; k++) {
+        const i = idx[k], p = local(i).toArray();
+        uv[i * 2] = p[ua] / tw; uv[i * 2 + 1] = p[va] / th;
+      }
+      faceTex[gr.colorIndex] = { name: t.image };
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  }
+  return faceTex;
 }
 
 function applyLook(obj) {
@@ -872,6 +1024,8 @@ function meshBrep(occt, bytes, item) {
   let faceCount = 0;
   for (const m of res.meshes) faceCount += (m.brep_faces || []).length;
   const useFaces = item.faceColors && item.faceColors.length === faceCount;
+  const hasVW = !!(item.vwTex && item.vwTex.length);
+  const perFace = useFaces || hasVW;
   let geoms = null;
   if (item.motions && item.motions.length) {
     // 部品の座標 → 画面の座標 = 親の配置 × 部品自身の配置（形状ファイルには部品自身の配置が入っている）
@@ -879,7 +1033,7 @@ function meshBrep(occt, bytes, item) {
     const owner = f => { for (let i = 0; i < item.motions.length; i++) { const k = item.motions[i].factorOf(f, faceCount); if (k !== null && k !== undefined && k !== 0) return [i, k]; } return null; };
     let any = false;
     for (let f = 0; f < faceCount && !any; f++) any = !!owner(f);
-    if (any) geoms = meshByMotion(res.meshes, Mdir, useFaces, item.motions, owner);
+    if (any) geoms = meshByMotion(res.meshes, Mdir, perFace, item.motions, owner);
   }
   if (!geoms) {
     geoms = [];
@@ -890,11 +1044,15 @@ function meshBrep(occt, bytes, item) {
       geo.setAttribute('position', new THREE.Float32BufferAttribute(m.attributes.position.array, 3));
       if (m.attributes.normal) geo.setAttribute('normal', new THREE.Float32BufferAttribute(m.attributes.normal.array, 3));
       geo.setIndex(m.index.array);
-      const groups = useFaces ? (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })) : null;
+      const groups = perFace ? (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })) : null;
       geoms.push({ geometry: geo, groups });
     }
   }
-  if (item.texture && !useFaces) addDefaultUVs(geoms, item.ownPlacement);
+  if (item.texture && !useFaces && !hasVW) addDefaultUVs(geoms, item.ownPlacement);
+  if (hasVW) {
+    const faceTexOf = f => { for (const t of item.vwTex) if (f >= t.faces[0] && f < t.faces[1]) return t; return null; };
+    geoms.faceTex = addVWUVs(geoms, item.ownPlacement, faceTexOf);
+  }
   const M = FCStdCore.chainMatrix(THREE, item.chain);
   for (const gd of geoms) gd.geometry.applyMatrix4(M);
   return geoms;
@@ -967,12 +1125,15 @@ async function openFile(file) {
       texture: it.texture, visible: it.visible, defVisible: it.visible, motions: it.motions,
       load: async () => {
         const tex = it.texture && !it.faceColors ? await loadTexture(it.texture) : null;
-        return buildObject(meshBrep(occt, files.get(it.shapeFile), it), it.color, it.transparency, it.faceColors, tex);
+        const geoms = meshBrep(occt, files.get(it.shapeFile), it);
+        return buildObject(geoms, it.color, it.transparency, it.faceColors, tex, { faceTex: geoms.faceTex || null, overlay: it.overlay });
       }
     }));
     clearModel();
     parts = newParts;
     initMove();
+    vwMats.clear();
+    currentTexNames = info.texNames || [];
     openGroups = new Set(); groupsInit = false;
     docInfo = { name: (info.label || file.name.replace(/\.fcstd$/i, '')), version: (info.version.match(/^[\d.]+/) || ['—'])[0], sample: false };
     const vis = parts.filter(p => p.visible);
@@ -986,6 +1147,8 @@ async function openFile(file) {
     hideLoading();
     renderParts(); updateTitle(); fitView('iso');
     const msgs = [...info.notes];
+    const missing = await updateTexStatus();
+    if (missing && missing.length) msgs.push(`木目などの画像 ${missing.length} 枚がファイルに入っていません。「詳細」の「画像を読み込む」で ${missing.join('、')} を選ぶと表示されます`);
     if (failed) msgs.push(`${failed} 件の形状を読み込めませんでした`);
     if (!parts.length) msgs.push('このファイルには表示できる立体がありません(スケッチのみ等)');
     else if (!vis.length) msgs.push('保存時にすべて非表示になっていました。部品パネルの ▼ から表示する部品を選んでください');
@@ -1534,6 +1697,9 @@ $('layout-reset').addEventListener('click', () => {
   store.del('tb'); store.del('pos'); store.del('partsSize'); layoutAll();
 });
 
+$('tex-load').addEventListener('click', () => $('tex-file').click());
+$('tex-file').addEventListener('change', e => { const fs = [...e.target.files]; e.target.value = ''; if (fs.length) addUserImages(fs); });
+
 // toolbar actions
 $('t-open').addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; openFile(f); });
@@ -1584,6 +1750,7 @@ function tick(now) {
 // ================= start =================
 (async () => {
   $('partsPanel').hidden = !partsOpen; $('t-parts').setAttribute('aria-pressed', partsOpen);
+  await loadStoredImages();
   parts = sampleParts();
   for (const p of parts) await ensureLoaded(p);
   renderParts(); updateTitle(); layoutAll();
