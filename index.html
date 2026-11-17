@@ -74,6 +74,8 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
 .ph { display: flex; align-items: center; gap: 6px; min-height: 34px; padding-right: 4px; cursor: grab; touch-action: none; }
 .ph .grow { flex: 1; min-width: 0; }
 .chev { flex: none; width: 32px; height: 32px; border: 0; background: none; border-radius: 7px; cursor: pointer; display: grid; place-items: center; color: var(--ink-2); }
+.chev.lab { width: auto; height: 28px; padding: 0 8px 0 9px; display: inline-flex; gap: 5px; align-items: center; border: 1px solid var(--line); color: var(--accent); font-size: 11.5px; font-weight: 500; }
+
 .chev svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; transition: transform .15s; }
 .chev[aria-expanded="true"] svg { transform: rotate(180deg); }
 .chev:active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
@@ -89,7 +91,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
 #info dd { margin: 0; font-family: var(--font-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 
 /* parts */
-#partsPanel { width: 230px; display: flex; flex-direction: column; overflow: hidden; }
+#partsPanel { width: 250px; display: flex; flex-direction: column; overflow: hidden; }
 #partsPanel .ph label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-weight: 500; }
 #partsPanel .count { font-family: var(--font-num); font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .cb { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); flex: none; }
@@ -108,7 +110,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
 .part .lbl { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; }
 .part .ty { display: block; font-family: var(--font-num); font-size: 10px; color: var(--ink-2); }
 .bulk { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
-.bulk button { font-size: 11.5px; color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 7px; min-height: 30px; padding: 0 9px; cursor: pointer; }
+.bulk button { white-space: nowrap; font-size: 11px; color: var(--accent); background: none; border: 1px solid var(--line); border-radius: 7px; min-height: 30px; padding: 0 9px; cursor: pointer; }
 
 /* toolbar */
 #toolbar { display: flex; align-items: center; gap: 2px; padding: 3px; }
@@ -145,6 +147,28 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
 .measure-out { font-family: var(--font-num); font-variant-numeric: tabular-nums; display: flex; gap: 4px 12px; font-size: 11.5px; flex-wrap: wrap; align-items: baseline; }
 .measure-out .big { font-size: 15px; font-weight: 500; }
 .measure-out .k { color: var(--ink-2); }
+
+/* 開閉 */
+#move-panel { width: min(560px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.move-all { flex-wrap: wrap; row-gap: 4px; padding: 4px 6px 4px 0; }
+.move-all .lbl { font-size: 12px; color: var(--ink-2); flex: none; }
+.move-all input[type=range] { flex: 1; min-width: 90px; accent-color: var(--cut); height: 32px; }
+#move-val { min-width: 0; font-size: 11.5px; }
+#move-body { border-top: 1px solid var(--line); }
+.move-list { list-style: none; margin: 0; padding: 2px 10px 0 12px; max-height: 34vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.move-list li { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+.move-list .nm { flex: 1; min-width: 6em; overflow-wrap: anywhere; line-height: 1.3; cursor: pointer; font-size: 12.5px; }
+.move-list li.open .nm { font-weight: 600; }
+.move-list input[type=range] { width: min(160px, 26vw); accent-color: var(--cut); height: 32px; }
+.move-list .v { font-family: var(--font-num); font-size: 11.5px; min-width: 104px; text-align: right; font-variant-numeric: tabular-nums; }
+.move-list .mini { min-width: 60px; }
+.move-hint { font-size: 11px; color: var(--ink-2); text-align: center; padding: 4px 10px 8px; }
+@media (max-width: 560px) {
+  .move-list li { flex-wrap: wrap; gap: 2px 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .move-list .nm { flex-basis: 100%; }
+  .move-list input[type=range] { flex: 1; width: auto; min-width: 0; }
+  .move-list .v { min-width: 0; font-size: 11px; }
+}
 
 /* settings */
 #settings { z-index: 4; padding: 12px 14px; width: 260px; display: grid; gap: 12px; }
@@ -191,7 +215,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     <span class="grip"><svg><use href="#i-grip"/></svg></span>
     <span class="grow"><span class="name" id="tb-name">サンプル部品</span></span>
     <span class="size" id="tb-size">—</span>
-    <button class="chev" id="info-tg" aria-expanded="false" aria-controls="info-body" aria-label="詳細を表示"><svg><use href="#i-chev"/></svg></button>
+    <button class="chev lab" id="info-tg" aria-expanded="false" aria-controls="info-body">詳細<svg><use href="#i-chev"/></svg></button>
   </div>
   <dl id="info-body" hidden>
     <dt>外形 W×D×H</dt><dd id="tb-size2">—</dd>
@@ -206,7 +230,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     <span class="grip"><svg><use href="#i-grip"/></svg></span>
     <label class="grow"><input type="checkbox" class="cb" id="all-cb">すべて</label>
     <span class="count" id="drawer-count"></span>
-    <button class="chev" id="parts-tg" aria-expanded="false" aria-controls="parts-body" aria-label="部品ごとに表示"><svg><use href="#i-chev"/></svg></button>
+    <button class="chev lab" id="parts-tg" aria-expanded="false" aria-controls="parts-body">一覧<svg><use href="#i-chev"/></svg></button>
   </div>
   <div id="parts-body" hidden>
     <div class="bulk"><button id="all-def">保存時の表示に戻す</button><button id="grp-all">グループを開閉</button></div>
@@ -230,6 +254,8 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
   <button class="tool" id="t-sec" aria-pressed="false" title="断面"><svg viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M3 13l18-3" stroke-width="2"/></svg><span class="tl">断面</span></button>
   <button class="tool" id="t-meas" aria-pressed="false" title="計測"><svg viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg><span class="tl">計測</span></button>
   <button class="tool" id="t-mode" title="表示モード"><svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg><span class="tl" id="mode-lbl">稜線あり</span></button>
+  <span class="sep" id="t-move-sep" hidden></span>
+  <button class="tool" id="t-move" aria-pressed="false" title="開閉" hidden><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="6"/><path d="M6 11v7h12v-7M10 14.5h4"/><path d="M12 19.5v2M10.5 20.5l1.5 1.5 1.5-1.5"/></svg><span class="tl">開閉</span></button>
   <button class="tool" id="t-set" aria-pressed="false" title="配置と大きさ"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span class="tl">設定</span></button>
   <span class="rs" data-resize title="ドラッグで大きさを変更" aria-hidden="true"><svg><use href="#i-rs"/></svg></span>
 </nav>
@@ -250,6 +276,22 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
   <button class="mini" id="meas-clear">消去</button>
 </section>
 
+<section class="float" id="move-panel" hidden aria-label="開閉">
+  <div class="ph move-all" data-drag>
+    <span class="grip"><svg><use href="#i-grip"/></svg></span>
+    <span class="lbl">すべて</span>
+    <button class="mini" id="move-close">閉じる</button>
+    <input type="range" id="move-range" min="0" max="1000" step="1" value="0" aria-label="すべての開き具合">
+    <span class="num" id="move-val">0 %</span>
+    <button class="mini" id="move-open">開く</button>
+    <button class="chev lab" id="move-tg" aria-expanded="false" aria-controls="move-body">一覧<svg><use href="#i-chev"/></svg></button>
+  </div>
+  <div id="move-body" hidden>
+    <ul class="move-list" id="move-list"></ul>
+    <div class="move-hint">3D の部品をタップすると、そこだけ開閉します</div>
+  </div>
+</section>
+
 <section class="float" id="settings" hidden aria-label="配置と大きさ">
   <h3>配置と大きさ</h3>
   <div class="row"><span class="lbl">ツールバーの位置</span>
@@ -262,6 +304,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     <div class="seg" role="group" aria-label="ボタンの名前" id="lbl-seg"><button data-lbl="0">隠す</button><button data-lbl="1">表示</button></div>
   </div>
   <p class="hint">各パネルは左端の点々をドラッグすると好きな場所へ動かせます。画面の端まで運ぶとツールバーはその辺に収まります。右下の角をドラッグすると大きさを変えられます。</p>
+  <p class="hint">マウス: ホイールを押したままドラッグで回転、右ドラッグで移動、ホイールで拡大縮小、左クリックで選択。</p>
   <button class="mini" id="layout-reset">配置を元に戻す</button>
 </section>
 
@@ -324,6 +367,56 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
       default: return c.getAttribute('value');
     }
   }
+
+  // 選択式のプロパティ（PropertyEnumeration）の、選ばれている文字
+  function enumText(p) {
+    if (!p) return '';
+    const iv = first(p, 'Integer');
+    const list = first(p, 'CustomEnumList');
+    if (!iv || !list) return '';
+    const e = kids(list, 'Enum')[parseInt(iv.getAttribute('value'), 10)];
+    return e ? e.getAttribute('value') || '' : '';
+  }
+
+  /* ---- 動き方（開閉）----
+     部品のプロパティ Motion（文字列。中身は JSON）に書かれた動き方を読む。書式は MOTION_SPEC.md。
+     ビューワーは部品の種類を知らなくてよいので、新しい動く部品を作ってもビューワーを直す必要はない。
+     動き 1 つ = { name, type: 'slide'|'rotate', axis, origin, min, max, value, factorOf(面番号, 面の数) → 倍率 or null } */
+  function num(v, d) { const x = Number(v); return Number.isFinite(x) ? x : d; }
+  function vec3(v, d) { return Array.isArray(v) && v.length === 3 && v.every(x => Number.isFinite(Number(x))) ? v.map(Number) : d; }
+  function parseMotion(text) {
+    const j = JSON.parse(text);
+    const list = Array.isArray(j) ? j : (j && Array.isArray(j.motions) ? j.motions : []);
+    const out = [];
+    for (const m of list) {
+      const type = m.type === 'rotate' ? 'rotate' : m.type === 'slide' ? 'slide' : null;
+      const axis = vec3(m.axis, null);
+      const ranges = Array.isArray(m.faces) ? m.faces.filter(r => Array.isArray(r) && r.length >= 2).map(r => [num(r[0], 0), num(r[1], 0), num(r[2], 1)]) : [];
+      if (!type || !axis || !ranges.length || axis.every(x => x === 0)) continue;
+      const min = num(m.min, 0), max = num(m.max, 0);
+      if (max === min) continue;
+      out.push({
+        name: String(m.name || (type === 'slide' ? '引出し' : '扉')), type, axis,
+        origin: vec3(m.origin, [0, 0, 0]), min, max, value: Math.max(Math.min(num(m.value, min), Math.max(min, max)), Math.min(min, max)),
+        factorOf: f => { for (const r of ranges) if (f >= r[0] && f < r[1]) return r[2]; return null; }
+      });
+    }
+    return out;
+  }
+
+  /* 互換用：Motion を書く前の家具CAD 試作版の部品（Proxy の module で見分け、形の並び順から動きを作る） */
+  const LEGACY_SLIDE = (minFaces, fn) => P => [{
+    name: '引出し', type: 'slide', axis: [0, -1, 0], origin: [0, 0, 0], min: 0, max: 450,
+    value: /開/.test(enumText(P.Extension)) ? 450 : 0,
+    factorOf: (f, n) => (n >= minFaces ? fn(f) : null)
+  }];
+  const LEGACY_MOTIONS = {
+    // ワイヤーシェルフII：左右のレール 24 個の箱（各 6 面。片側 12 個：固定 3・中間 3・内側 6）→ シェルフ
+    'furniture.wire_shelf': LEGACY_SLIDE(145, f => (f < 144 ? [0, 0, 0, 0.5, 0.5, 0.5, 1, 1, 1, 1, 1, 1][Math.floor(f / 6) % 12] : 1)),
+    // フレームバスケットII：下・上のレール 7 個ずつの箱（固定 3・中間 1・動く部材 1・ブラケット 2）→ フレーム・バスケット
+    'furniture.frame_basket': LEGACY_SLIDE(85, f => (f < 84 ? [0, 0, 0, 0.5, 1, 1, 1][Math.floor(f / 6) % 7] : 1))
+  };
+
 
   function unpackColor(u) { return [((u >>> 24) & 255) / 255, ((u >>> 16) & 255) / 255, ((u >>> 8) & 255) / 255]; }
 
@@ -397,6 +490,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     const label = propValue(docProps.Label) || '';
 
     const objects = new Map();
+    const motionErrors = [];
     const objsEl = first(docRoot, 'Objects');
     if (objsEl) for (const o of kids(objsEl, 'Object')) objects.set(o.getAttribute('name'), { name: o.getAttribute('name'), type: o.getAttribute('type') || '' });
 
@@ -417,6 +511,16 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
         ob.linkPlacement = propValue(P.LinkPlacement) || ob.placement;
       }
       if (ob.type === 'PartDesign::Body') ob.tip = propValue(P.Tip) || null;
+      // 動き方：プロパティ Motion を読む。無ければ、家具CAD 試作版の部品として互換の動きを作る
+      if (P.Motion) {
+        try { const ms = parseMotion(propValue(P.Motion) || ''); if (ms.length) ob.motions = ms; }
+        catch (e) { motionErrors.push(ob.label || ob.name); }
+      }
+      if (!ob.motions) {
+        const py = P.Proxy ? first(P.Proxy, 'Python') : null;
+        const mod = py ? py.getAttribute('module') || '' : '';
+        if (LEGACY_MOTIONS[mod]) ob.motions = LEGACY_MOTIONS[mod](P);
+      }
       // collect every linked name, for the "leaf" fallback
       ob.refs = [];
       for (const k in P) {
@@ -443,16 +547,20 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
           else if (list && list.length === 1 && !P.ShapeColor) ob.color = unpackColor(list[0]);
         }
         if (P.ShapeAppearance) {
+          // FreeCAD 1.x: ShapeAppearance is authoritative; ShapeColor/DiffuseColor are stale legacy copies
           const f = propValue(P.ShapeAppearance);
           const list = f && files.get(f.file) ? readMaterialList(files.get(f.file), f.version) : null;
           if (list && list.length) {
-            if (!P.ShapeColor) ob.color = unpackColor(list[0].diffuse);
-            if (!P.Transparency && list[0].transparency > 0) ob.transparency = list[0].transparency;
+            ob.color = unpackColor(list[0].diffuse);
+            ob.transparency = list[0].transparency > 0.001 ? list[0].transparency : (P.Transparency ? ob.transparency : 0);
+            ob.faceColors = null; ob.texture = null;
             if (list.length > 1) ob.faceColors = list.map(m => unpackColor(m.diffuse));
             // FreeCAD shows an image texture only when one material covers the whole shape
             else if (list[0].image) ob.texture = imageDataUrl(list[0].image);
+            else if (list[0].imagePath) ob.texturePathOnly = list[0].imagePath;
           }
         }
+        if (P.OverrideMaterial) ob.overrideMaterial = propValue(P.OverrideMaterial) === true;
       }
     }
 
@@ -515,16 +623,19 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     }
 
     function makeItem(shapeOb, viewOb, chain, visible, key) {
+      const ov = viewOb !== shapeOb && viewOb.overrideMaterial && !!viewOb.color;
       let group = '';
       let p = viewOb.parent ? objects.get(viewOb.parent) : null;
       while (p && !group) { if (/^(App::Part|App::DocumentObjectGroup|Arch|BuildingPart)/.test(p.type) || p.group) group = p.label; p = p.parent ? objects.get(p.parent) : null; }
       return {
         key, name: viewOb.name, label: viewOb.label || viewOb.name, type: shapeOb.type,
         shapeFile: shapeOb.shapeFile, chain, visible,
-        color: shapeOb.color || [0.8, 0.8, 0.8], transparency: shapeOb.transparency || 0,
-        faceColors: shapeOb.faceColors || null, group,
-        texture: viewOb.texture || shapeOb.texture || null,
-        ownPlacement: shapeOb.placement || null
+        color: (ov ? viewOb.color : shapeOb.color) || [0.8, 0.8, 0.8], transparency: (ov ? viewOb.transparency : shapeOb.transparency) || 0,
+        faceColors: ov ? null : (shapeOb.faceColors || null), group,
+        texturePathOnly: (ov ? viewOb : shapeOb).texturePathOnly || null,
+        texture: (viewOb !== shapeOb && viewOb.overrideMaterial ? viewOb.texture : shapeOb.texture) || null,
+        ownPlacement: shapeOb.placement || null,   // 形状ファイルにすでに入っている、部品自身の配置（開く向き・テクスチャの計算に使う）
+        motions: shapeOb.motions || null
       };
     }
 
@@ -535,9 +646,12 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     const uniq = items.filter(it => (seen.has(it.key) ? false : (seen.add(it.key), true)));
 
     for (const it of uniq) if (it.shapeFile && !files.has(it.shapeFile)) it.missing = true;
+    const pathOnly = uniq.filter(it => it.visible && it.texturePathOnly && !it.texture);
+    if (pathOnly.length) notes.push('画像がファイル内に保存されておらず、パソコン上の画像ファイルを参照している部品が ' + pathOnly.length + ' 件あり、その画像は表示できません');
     const bin = uniq.filter(it => it.shapeFile && /\.bin$/i.test(it.shapeFile));
     if (bin.length) notes.push('バイナリ形式で保存された形状が ' + bin.length + ' 件あり、表示できない可能性があります');
 
+    if (motionErrors.length) notes.push('動き方（Motion）を読めなかった部品があります：' + motionErrors.join('、'));
     return { label, version, objects, items: uniq, notes };
   }
 
@@ -557,7 +671,7 @@ button:focus-visible, input:focus-visible, .grip:focus-visible { outline: 2px so
     return new THREE.Matrix4().compose(new THREE.Vector3(...pl.p), new THREE.Quaternion(...pl.q).normalize(), new THREE.Vector3(1, 1, 1));
   }
 
-  const api = { analyze, chainMatrix, readMaterialList, readU32List, placementMatrix };
+  const api = { analyze, chainMatrix, readMaterialList, readU32List, placementMatrix, parseMotion };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.FCStdCore = api;
 })(typeof self !== 'undefined' ? self : this);
 
@@ -587,6 +701,11 @@ camera.up.set(0, 0, 1);
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.12; controls.screenSpacePanning = true;
 controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+// mouse: wheel-button drag rotates, right drag pans, wheel zooms, left click only selects / measures
+controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN };
+renderer.domElement.addEventListener('mousedown', e => { if (e.button === 1) e.preventDefault(); });
+renderer.domElement.addEventListener('auxclick', e => { if (e.button === 1) e.preventDefault(); });
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.75));
 const key = new THREE.DirectionalLight(0xffffff, 0.75);
@@ -656,6 +775,7 @@ function buildObject(geoms, color, transparency, faceColors, texture) {
     const mesh = new THREE.Mesh(geo, useMats); mesh.userData.pick = true; g.add(mesh);
     const cap = new THREE.Mesh(geo, capMat); cap.userData.cap = true; cap.visible = false; cap.renderOrder = -1; g.add(cap);
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 28), lineMat); edges.userData.edge = true; g.add(edges);
+    if (gd.motion) for (const o of [mesh, cap, edges]) o.userData.motion = gd.motion;   // 開閉で動く部分
   }
   g.userData.mats = mats; g.userData.capMat = capMat; g.userData.lineMat = lineMat;
   return g;
@@ -752,20 +872,78 @@ function meshBrep(occt, bytes, item) {
   let faceCount = 0;
   for (const m of res.meshes) faceCount += (m.brep_faces || []).length;
   const useFaces = item.faceColors && item.faceColors.length === faceCount;
-  let faceIdx = 0;
-  const geoms = [];
-  for (const m of res.meshes) {
-    if (!m.index || !m.index.array.length) continue;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(m.attributes.position.array, 3));
-    if (m.attributes.normal) geo.setAttribute('normal', new THREE.Float32BufferAttribute(m.attributes.normal.array, 3));
-    geo.setIndex(m.index.array);
-    const groups = useFaces ? (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })) : null;
-    geoms.push({ geometry: geo, groups });
+  let geoms = null;
+  if (item.motions && item.motions.length) {
+    // 部品の座標 → 画面の座標 = 親の配置 × 部品自身の配置（形状ファイルには部品自身の配置が入っている）
+    const Mdir = FCStdCore.chainMatrix(THREE, item.chain.concat(item.ownPlacement ? [item.ownPlacement] : []));
+    const owner = f => { for (let i = 0; i < item.motions.length; i++) { const k = item.motions[i].factorOf(f, faceCount); if (k !== null && k !== undefined && k !== 0) return [i, k]; } return null; };
+    let any = false;
+    for (let f = 0; f < faceCount && !any; f++) any = !!owner(f);
+    if (any) geoms = meshByMotion(res.meshes, Mdir, useFaces, item.motions, owner);
+  }
+  if (!geoms) {
+    geoms = [];
+    let faceIdx = 0;
+    for (const m of res.meshes) {
+      if (!m.index || !m.index.array.length) continue;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(m.attributes.position.array, 3));
+      if (m.attributes.normal) geo.setAttribute('normal', new THREE.Float32BufferAttribute(m.attributes.normal.array, 3));
+      geo.setIndex(m.index.array);
+      const groups = useFaces ? (m.brep_faces || []).map(f => ({ start: f.first * 3, count: (f.last - f.first + 1) * 3, colorIndex: faceIdx++ })) : null;
+      geoms.push({ geometry: geo, groups });
+    }
   }
   if (item.texture && !useFaces) addDefaultUVs(geoms, item.ownPlacement);
   const M = FCStdCore.chainMatrix(THREE, item.chain);
   for (const gd of geoms) gd.geometry.applyMatrix4(M);
+  return geoms;
+}
+
+// 開閉できる部品：面ごとに「どの動きに・何倍で」動くかで形を分ける（動かない面は 1 つにまとめる）。
+// 分けた形には motion { mi（動きの番号）, factor, type, axis, origin（画面の座標） } を付け、applyMotion で動かす
+function meshByMotion(meshes, Mdir, useFaces, motions, owner) {
+  const R = new THREE.Matrix4().extractRotation(Mdir);
+  const world = motions.map(m => ({
+    type: m.type,
+    axis: new THREE.Vector3(...m.axis).applyMatrix4(R).normalize().toArray(),
+    origin: new THREE.Vector3(...m.origin).applyMatrix4(Mdir).toArray()
+  }));
+  const buckets = new Map();   // 'mi:factor' または 'static' → { pos, nor, idx, groups, mi, factor }
+  let faceIdx = 0;
+  for (const m of meshes) {
+    const P = m.attributes.position.array, N = m.attributes.normal ? m.attributes.normal.array : null, I = m.index ? m.index.array : [];
+    for (const f of (m.brep_faces || [])) {
+      const o = owner(faceIdx);
+      const k = o ? o[0] + ':' + o[1] : 'static';
+      if (!buckets.has(k)) buckets.set(k, { pos: [], nor: [], idx: [], groups: [], map: new Map(), mi: o ? o[0] : -1, factor: o ? o[1] : 0 });
+      const b = buckets.get(k);
+      const start = b.idx.length;
+      for (let t = f.first; t <= f.last; t++) for (let j = 0; j < 3; j++) {
+        const v = I[t * 3 + j];
+        let nv = b.map.get(v);
+        if (nv === undefined) {
+          nv = b.pos.length / 3; b.map.set(v, nv);
+          b.pos.push(P[v * 3], P[v * 3 + 1], P[v * 3 + 2]);
+          if (N) b.nor.push(N[v * 3], N[v * 3 + 1], N[v * 3 + 2]);
+        }
+        b.idx.push(nv);
+      }
+      b.groups.push({ start, count: b.idx.length - start, colorIndex: faceIdx });
+      faceIdx++;
+    }
+    for (const b of buckets.values()) b.map = new Map();   // 頂点の番号は形（mesh）ごと
+  }
+  const geoms = [];
+  for (const b of buckets.values()) {
+    if (!b.idx.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    if (b.nor.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+    geo.setIndex(b.idx);
+    const motion = b.mi < 0 ? null : Object.assign({ mi: b.mi, factor: b.factor }, world[b.mi]);
+    geoms.push({ geometry: geo, groups: useFaces ? b.groups : null, motion });
+  }
   return geoms;
 }
 
@@ -786,7 +964,7 @@ async function openFile(file) {
 
     const newParts = info.items.filter(it => it.shapeFile && !it.missing).map((it, i) => ({
       id: 'f' + i, label: it.label, type: it.type, group: it.group, color: it.color, transparency: it.transparency,
-      texture: it.texture, visible: it.visible, defVisible: it.visible,
+      texture: it.texture, visible: it.visible, defVisible: it.visible, motions: it.motions,
       load: async () => {
         const tex = it.texture && !it.faceColors ? await loadTexture(it.texture) : null;
         return buildObject(meshBrep(occt, files.get(it.shapeFile), it), it.color, it.transparency, it.faceColors, tex);
@@ -794,6 +972,7 @@ async function openFile(file) {
     }));
     clearModel();
     parts = newParts;
+    initMove();
     openGroups = new Set(); groupsInit = false;
     docInfo = { name: (info.label || file.name.replace(/\.fcstd$/i, '')), version: (info.version.match(/^[\d.]+/) || ['—'])[0], sample: false };
     const vis = parts.filter(p => p.visible);
@@ -824,6 +1003,7 @@ async function ensureLoaded(p) {
     p.obj = await p.load();
     p.obj.userData.part = p;
     applyLook(p.obj);
+    applyMotion(p);          // あとから表示した部品も、今の引出し量に合わせる
     model.add(p.obj);
   } finally { p.loading = false; }
   p.obj.visible = p.visible;
@@ -934,7 +1114,13 @@ function select(p) {
 // ================= info =================
 function visibleBox() {
   const box = new THREE.Box3();
-  for (const p of parts) if (p.obj && p.visible) box.expandByObject(p.obj);
+  for (const p of parts) if (p.obj && p.visible) {
+    // 開閉で回転させた部分（扉など）だけは、外接箱を回すと大きく出るので、頂点から正確に測る
+    p.obj.traverse(o => {
+      if (!o.userData.pick) return;
+      box.expandByObject(o, !!(o.userData.motion && o.userData.motion.type === 'rotate'));
+    });
+  }
   return box;
 }
 const fmt = v => (Math.abs(v) >= 1000 ? v.toFixed(0) : Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2));
@@ -1024,10 +1210,141 @@ function setMeasure(on) {
 }
 $('meas-clear').addEventListener('click', clearMeasure);
 
+// ---------- 開閉（部品の動き方 Motion。書式は MOTION_SPEC.md） ----------
+// 開き具合 t は 0〜1（画面では 0〜100 %）。動きごとに min + t × (max − min) にする。
+// 開き具合は「部品 × 動き」ごとに持つ（p.moveT[動きの番号]）ので、扉・引出しを 1 つずつ開閉できる。
+// 一覧の上の「すべて」で、全部を同じ開き具合にもできる。
+let moveEntries = [];  // [{ p, mi, row }] 開閉できる「部品 × 動き」の一覧
+let moveAnim = null;   // { start, ms, items: [{ e, x0, x1 }] }
+const moveParts = () => parts.filter(p => p.motions && p.motions.length);
+const frac = m => (m.value - m.min) / (m.max - m.min);
+const _mv = { a: new THREE.Vector3(), o: new THREE.Vector3(), m: new THREE.Matrix4(), r: new THREE.Matrix4(), t: new THREE.Matrix4() };
+function applyMotion(p) {
+  if (!p.obj || !p.motions || !p.moveT) return;
+  p.obj.traverse(o => {
+    const mo = o.userData.motion;
+    if (!mo) return;
+    const m = p.motions[mo.mi];
+    const d = (m.min + p.moveT[mo.mi] * (m.max - m.min) - m.value) * mo.factor;     // 保存時からの変化
+    o.matrixAutoUpdate = false;
+    _mv.a.fromArray(mo.axis);
+    if (mo.type === 'slide') o.matrix.makeTranslation(_mv.a.x * d, _mv.a.y * d, _mv.a.z * d);
+    else {
+      _mv.o.fromArray(mo.origin);
+      _mv.r.makeRotationAxis(_mv.a, THREE.MathUtils.degToRad(d));
+      o.matrix.makeTranslation(_mv.o.x, _mv.o.y, _mv.o.z).multiply(_mv.r).multiply(_mv.t.makeTranslation(-_mv.o.x, -_mv.o.y, -_mv.o.z));
+    }
+    o.matrixWorldNeedsUpdate = true;
+  });
+}
+function valueLabel(m, t) {
+  const v = m.min + t * (m.max - m.min);
+  return Math.round(t * 100) + ' %' + (m.type === 'slide' ? `（${Math.round(v)} mm）` : `（${Math.round(v)}°）`);
+}
+function entryT(e) { return e.p.moveT[e.mi]; }
+function refreshAllRow() {
+  // 「すべて」の行：開き具合がそろっていればその値、ばらばらなら平均の位置に置いて「ばらばら」と出す
+  if (!moveEntries.length) return;
+  const ts = moveEntries.map(entryT);
+  const same = ts.every(t => Math.abs(t - ts[0]) < 1e-4);
+  const avg = ts.reduce((a, b) => a + b, 0) / ts.length;
+  $('move-range').value = Math.round(avg * 1000);
+  const ms = moveEntries.map(e => e.p.motions[e.mi]);
+  const uniform = ms.every(m => m.type === ms[0].type && m.min === ms[0].min && m.max === ms[0].max);
+  $('move-val').textContent = !same ? 'ばらばら' : (uniform ? valueLabel(ms[0], ts[0]) : Math.round(ts[0] * 100) + ' %');
+}
+function refreshRow(e) {
+  if (!e.row) return;
+  const t = entryT(e), m = e.p.motions[e.mi];
+  e.row.range.value = Math.round(t * 1000);
+  e.row.val.textContent = valueLabel(m, t);
+  e.row.btn.textContent = t > 0.5 ? '閉じる' : '開く';
+  e.row.li.classList.toggle('open', t > 0.001);
+}
+function setEntry(e, t) {
+  e.p.moveT[e.mi] = Math.max(0, Math.min(1, t));
+  applyMotion(e.p);
+  refreshRow(e);
+}
+function afterMove() { refreshAllRow(); updateTitle(); if (clipOn) updateSection(); }
+function animateEntries(list, t) {
+  // list の動きを、開き具合 t までなめらかに動かす（動いている途中の物は、今の位置から）
+  moveAnim = null;
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const items = list.map(e => ({ e, x0: entryT(e), x1: t })).filter(it => Math.abs(it.x1 - it.x0) > 0.001);
+  if (!items.length) return;
+  if (reduce) { items.forEach(it => setEntry(it.e, it.x1)); afterMove(); return; }
+  const far = Math.max(...items.map(it => Math.abs(it.x1 - it.x0)));
+  moveAnim = { start: performance.now(), ms: 300 + far * 600, items };
+}
+function toggleEntry(e) { animateEntries([e], entryT(e) > 0.5 ? 0 : 1); }
+function stepMoveAnim(now) {
+  if (!moveAnim) return;
+  const k = Math.min((now - moveAnim.start) / moveAnim.ms, 1), s = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+  for (const it of moveAnim.items) setEntry(it.e, it.x0 + (it.x1 - it.x0) * s);
+  if (k >= 1) { moveAnim = null; afterMove(); } else refreshAllRow();
+}
+function setMovePanel(on) {
+  $('t-move').setAttribute('aria-pressed', on); $('move-panel').hidden = !on; layoutSubs();
+}
+function buildMoveList() {
+  const ul = $('move-list'); ul.innerHTML = '';
+  for (const e of moveEntries) {
+    const m = e.p.motions[e.mi];
+    const li = document.createElement('li');
+    const nm = document.createElement('span'); nm.className = 'nm';
+    nm.textContent = e.p.label + (e.p.motions.length > 1 || m.name !== e.p.label ? '・' + m.name : '');
+    nm.addEventListener('click', () => { if (e.p.obj && e.p.visible) focusOn(e.p.obj); });
+    const range = document.createElement('input'); range.type = 'range'; range.min = 0; range.max = 1000; range.step = 1;
+    range.setAttribute('aria-label', nm.textContent + 'の開き具合');
+    range.addEventListener('input', () => { moveAnim = null; setEntry(e, range.value / 1000); refreshAllRow(); });
+    range.addEventListener('change', () => { setEntry(e, range.value / 1000); afterMove(); });
+    const val = document.createElement('span'); val.className = 'v';
+    const btn = document.createElement('button'); btn.className = 'mini'; btn.addEventListener('click', () => toggleEntry(e));
+    li.append(nm, range, val, btn); ul.appendChild(li);
+    e.row = { li, range, val, btn };
+    refreshRow(e);
+  }
+  // 1 か所だけなら「すべて」の行で足りる。ふだんは「すべて」だけ、「一覧」で 1 か所ずつ
+  $('move-tg').hidden = moveEntries.length < 2;
+  if (moveEntries.length < 2) setExpanded($('move-tg'), $('move-body'), false);
+}
+function initMove() {
+  // ファイルを開いたとき：開閉できる部品があればボタンを出し、一覧を作り、それぞれ保存時の状態から始める
+  moveAnim = null;
+  moveEntries = [];
+  for (const p of moveParts()) {
+    p.moveT = p.motions.map(frac);
+    p.motions.forEach((m, mi) => moveEntries.push({ p, mi, row: null }));
+  }
+  $('t-move').hidden = $('t-move-sep').hidden = !moveEntries.length;
+  requestAnimationFrame(layoutAll);
+  if (!moveEntries.length) { setMovePanel(false); $('move-list').innerHTML = ''; return; }
+  buildMoveList();
+  refreshAllRow();
+  $('t-move').title = moveEntries.length + ' か所を開閉できます（' + [...new Set(moveEntries.map(e => e.p.motions[e.mi].name))].join('・') + '）';
+}
+$('t-move').addEventListener('click', () => setMovePanel($('move-panel').hidden));
+$('move-range').addEventListener('input', e => { moveAnim = null; for (const x of moveEntries) setEntry(x, e.target.value / 1000); refreshAllRow(); });
+$('move-range').addEventListener('change', e => { for (const x of moveEntries) setEntry(x, e.target.value / 1000); afterMove(); });
+$('move-open').addEventListener('click', () => animateEntries(moveEntries.filter(e => e.p.visible), 1));
+$('move-close').addEventListener('click', () => animateEntries(moveEntries, 0));
+
+// 開閉パネルを開いているときは、3D の部品をタップすると、そこだけ開閉する
+function entryForHit(hitObj) {
+  const p = hitObj.parent.userData.part;
+  if (!p || !p.motions) return null;
+  const mo = hitObj.userData.motion;
+  const mi = mo ? mo.mi : (p.motions.length === 1 ? 0 : -1);   // 動かない面をタップしたとき：動きが 1 つならそれ
+  return moveEntries.find(e => e.p === p && e.mi === mi) || null;
+}
+$('move-tg').addEventListener('click', () => { setExpanded($('move-tg'), $('move-body'), $('move-body').hidden); layoutSubs(); });
+
+
 // ================= picking =================
 const ray = new THREE.Raycaster();
 let down = null;
-renderer.domElement.addEventListener('pointerdown', e => { if (e.isPrimary) down = { x: e.clientX, y: e.clientY, t: performance.now() }; closeSettings(); });
+renderer.domElement.addEventListener('pointerdown', e => { if (e.isPrimary && e.button === 0) down = { x: e.clientX, y: e.clientY, t: performance.now() }; closeSettings(); });
 renderer.domElement.addEventListener('pointerup', e => {
   if (!down || !e.isPrimary) return;
   const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), quick = performance.now() - down.t < 450;
@@ -1039,6 +1356,7 @@ renderer.domElement.addEventListener('pointerup', e => {
   model.traverse(o => { if (o.userData.pick && o.parent.visible) targets.push(o); });
   const hit = ray.intersectObjects(targets, false).find(h => !clipOn || clip.distanceToPoint(h.point) >= -1e-6);
   if (measuring) { if (hit) addMeasurePoint(hit.point); return; }
+  if (hit && !$('move-panel').hidden) { const me = entryForHit(hit.object); if (me) { toggleEntry(me); return; } }
   const p = hit ? hit.object.parent.userData.part : null;
   if (p) select(p); else if (selected) select(selected);
 });
@@ -1079,7 +1397,7 @@ function rectOf(el) { return el.hidden ? null : el.getBoundingClientRect(); }
 const DEF_TB = { dock: 'bottom', x: null, y: null, vertical: false, size: 36, labels: false };
 let tb = Object.assign({}, DEF_TB, store.get('tb', {}));
 let pos = store.get('pos', {});           // id -> {x,y} for panels the viewer moved
-let partsSize = store.get('partsSize', { w: 230, h: 320 });
+let partsSize = store.get('partsSize', { w: 250, h: 320 });
 let partsOpen = store.get('partsOpen', true);
 
 function applyToolbarStyle() {
@@ -1125,7 +1443,7 @@ function placePanels() {
 }
 function layoutSubs() {
   const t = $('toolbar').getBoundingClientRect(), B = bounds();
-  const subs = ['settings', 'sec-panel', 'meas-panel'].map($).filter(el => !el.hidden);
+  const subs = ['settings', 'move-panel', 'sec-panel', 'meas-panel'].map($).filter(el => !el.hidden);
   let offset = 0;
   for (const el of subs) {
     if (el.id !== 'settings' && pos[el.id]) { placeAt(el, pos[el.id].x, pos[el.id].y); continue; }
@@ -1162,7 +1480,7 @@ function makeDraggable(el) {
     startDrag(el, e, null, p => { pos[el.id] = p; store.set('pos', pos); if (el.id === 'info' && !pos.partsPanel) placePanels(); });
   }));
 }
-['info', 'partsPanel', 'sec-panel', 'meas-panel'].forEach(id => makeDraggable($(id)));
+['info', 'partsPanel', 'sec-panel', 'meas-panel', 'move-panel'].forEach(id => makeDraggable($(id)));
 
 // toolbar: drag anywhere, snap to an edge when dropped near it
 $('toolbar').querySelector('.grip').addEventListener('pointerdown', e => {
@@ -1212,7 +1530,7 @@ document.querySelectorAll('#dock-seg button').forEach(b => b.addEventListener('c
 document.querySelectorAll('#lbl-seg button').forEach(b => b.addEventListener('click', () => { tb.labels = b.dataset.lbl === '1'; store.set('tb', tb); layoutAll(); }));
 $('tb-size-range').addEventListener('input', e => { tb.size = +e.target.value; store.set('tb', tb); layoutAll(); });
 $('layout-reset').addEventListener('click', () => {
-  tb = Object.assign({}, DEF_TB); pos = {}; partsSize = { w: 230, h: 320 };
+  tb = Object.assign({}, DEF_TB); pos = {}; partsSize = { w: 250, h: 320 };
   store.del('tb'); store.del('pos'); store.del('partsSize'); layoutAll();
 });
 
@@ -1250,6 +1568,7 @@ function tick(now) {
     camera.position.lerpVectors(anim.p0, anim.p1, e); controls.target.lerpVectors(anim.q0, anim.q1, e);
     if (k >= 1) anim = null;
   }
+  stepMoveAnim(now);
   controls.update();
   if (stage.clientWidth !== renderer.domElement.width / renderer.getPixelRatio()) resize();
   renderer.render(scene, camera);
